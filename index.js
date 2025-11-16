@@ -233,7 +233,7 @@ async function runInteractorAnimation(action) {
   if (action === 'brush') {
     // sikat: a bit above/front for circular orbit
     localStart.set(0.0, 0.36, 0.15); // above tooth center (adjust if needed)
-    localRot.set(-0.85, 0, 0);       // tilted downwards
+    localRot.set(0, 0, 0);       // tilted downwards
     localScale.set(0.55,0.55,0.55);  // suitable brush size
   } else if (action === 'healthy') {
     // wortel: start high above and a bit in front (will fall)
@@ -690,5 +690,6 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
 
 
