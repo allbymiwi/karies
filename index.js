@@ -294,9 +294,9 @@ function animateBrush(wrapper) {
     const initialScale = wrapper.scale.x;
 
     // config: orbit radius (local), number of revolutions, durations (ms)
-    const radius = 0.20;          // orbit radius in local units (adjustable)
-    const revolutions = 3;        // how many circles
-    const orbitDuration = 1500;    // ms total for orbit phase
+    const radius = 0.50;          // orbit radius in local units (adjustable)
+    const revolutions = 5;        // how many circles
+    const orbitDuration = 5000;    // ms total for orbit phase
     const approachDur = 140;      // move into orbit from slightly farther
     const retreatDur = 140;       // move back to start and finish
     const totalOrbitTime = orbitDuration;
@@ -690,4 +690,5 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
 
