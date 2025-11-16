@@ -3,55 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>kARies - AR Edukasi Gigi</title>
+  <title>CARIOFRIENDS - AR VERSION</title>
   <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-  <header>
-    <h3 style="margin:8px 0 0 12px;color:#fff">kARies - AR Edukasi Gigi</h3>
-  </header>
-
   <!-- XR Button -->
   <button id="xrBtn" class="xr-btn">Enter AR</button>
 
   <!-- AR canvas -->
   <canvas id="canvas"></canvas>
-
-  <!-- UI overlay -->
-  <div id="ui">
-    <div id="bars">
-      <div class="status-bar clean">
-        <img src="icons/water.png" class="status-icon" alt="Kebersihan">
-        <span class="status-label">Kebersihan</span>
-        <div class="bar-fill"><div id="cleanFill" class="bar-inner"></div></div>
-      </div>
-
-      <div class="status-bar health">
-        <img src="icons/heart.png" class="status-icon" alt="Kesehatan">
-        <span class="status-label">Kesehatan</span>
-        <div class="bar-fill"><div id="healthFill" class="bar-inner"></div></div>
-      </div>
-    </div>
-
-    <div id="infoText">Arahkan kamera ke lantai dan tekan Enter AR</div>
-
-    <div id="buttons">
-      <button class="action-btn brush" data-action="brush">
-        <img src="icons/sikat.png" alt="Gosok Gigi">
-        <span>Gosok Gigi</span>
-      </button>
-
-      <button class="action-btn healthy" data-action="healthy">
-        <img src="icons/wortel.png" alt="Makanan Sehat">
-        <span>Makanan Sehat</span>
-      </button>
-
-      <button class="action-btn sweet" data-action="sweet">
-        <img src="icons/permen.png" alt="Makanan Manis">
-        <span>Makanan Manis</span>
-      </button>
-    </div>
-  </div>
 
   <!-- UI logic must load BEFORE AR logic so listeners are ready -->
   <script src="./ui.js"></script>
