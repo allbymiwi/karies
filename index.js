@@ -179,5 +179,3 @@ function render(time, frame) {
 
 // init
 initThree();
-
-

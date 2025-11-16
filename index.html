@@ -3,19 +3,56 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR - Gigisehat</title>
-  <style>
-    body { margin:0; overflow:hidden; font-family:system-ui,Segoe UI,Roboto; background:#000; }
-    header { position: absolute; top: 8px; left: 8px; z-index: 10; color:#fff; }
-    .xr-btn { position: absolute; top:10px; left:10px; z-index:20; padding:8px 12px; border-radius:8px; border: none; background:#0b66ff; color:#fff; }
-    canvas { display:block; width:100vw; height:100vh; position: absolute; }
-  </style>
+  <title>kARies - AR Edukasi Gigi</title>
+  <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-  <header><h3 style="margin:0">AR - Gigisehat</h3></header>
+  <!-- Header / Buttons -->
+  <header><h3 style="margin:8px 0 0 12px;color:#fff">kARies - AR Edukasi Gigi</h3></header>
   <button id="xrBtn" class="xr-btn">Enter AR</button>
+
+  <!-- AR canvas (Three.js renderer will use this) -->
   <canvas id="canvas"></canvas>
 
+  <!-- UI Overlay (mirip contoh A-Frame) -->
+  <div id="ui">
+    <div id="bars">
+      <div class="status-bar clean">
+        <img src="icons/water.png" class="status-icon" alt="Kebersihan">
+        <span class="status-label">Kebersihan</span>
+        <div class="bar-fill"><div id="cleanFill" class="bar-inner"></div></div>
+      </div>
+
+      <div class="status-bar health">
+        <img src="icons/heart.png" class="status-icon" alt="Kesehatan">
+        <span class="status-label">Kesehatan</span>
+        <div class="bar-fill"><div id="healthFill" class="bar-inner"></div></div>
+      </div>
+    </div>
+
+    <div id="infoText">Arahkan kamera ke lantai dan tekan Enter AR</div>
+
+    <div id="buttons">
+      <button class="action-btn brush" data-action="brush">
+        <img src="icons/sikat.png" alt="Gosok Gigi">
+        <span>Gosok Gigi</span>
+      </button>
+
+      <button class="action-btn healthy" data-action="healthy">
+        <img src="icons/wortel.png" alt="Makanan Sehat">
+        <span>Makanan Sehat</span>
+      </button>
+
+      <button class="action-btn sweet" data-action="sweet">
+        <img src="icons/permen.png" alt="Makanan Manis">
+        <span>Makanan Manis</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- AR logic (module) -->
   <script type="module" src="./index.js"></script>
+  <!-- UI logic -->
+  <script src="./ui.js"></script>
 </body>
 </html>
