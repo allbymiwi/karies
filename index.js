@@ -1,4 +1,4 @@
-// index.js (final merged) - fixes: relative scale for carrot/candy, fade-out, wait-for-animation flow
+// index.js (brush animation: circular orbit over tooth) - full file
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -231,10 +231,10 @@ async function runInteractorAnimation(action) {
   const localScale = new THREE.Vector3(1,1,1);
 
   if (action === 'brush') {
-    // sikat: a bit above/front for clear stroke
-    localStart.set(0.42, 0.20, 0.32);
-    localRot.set(-0.6, 0.6, -1.2);
-    localScale.set(0.65,0.65,0.65);
+    // sikat: a bit above/front for circular orbit
+    localStart.set(0.0, 0.36, 0.15); // above tooth center (adjust if needed)
+    localRot.set(-0.85, 0, 0);       // tilted downwards
+    localScale.set(0.55,0.55,0.55);  // suitable brush size
   } else if (action === 'healthy') {
     // wortel: start high above and a bit in front (will fall)
     localStart.set(0.0, 1.6, 0.9);
@@ -282,50 +282,83 @@ async function runInteractorAnimation(action) {
 function lerp(a,b,t){ return a + (b-a)*t; }
 function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
 
-// animate brush: approach -> 2 strokes -> retreat (unchanged)
+// --- NEW: animateBrush -> circular orbit above tooth
 function animateBrush(wrapper) {
   return new Promise((resolve) => {
-    const startTime = performance.now();
-    const initial = { x: wrapper.position.x, y: wrapper.position.y, z: wrapper.position.z, rotZ: wrapper.rotation.z };
-    const approachDur = 120;
-    const strokeDur = 370;
-    const retreatDur = 120;
+    const start = performance.now();
+    // capture initial local pos/rot/scale
+    const cx = wrapper.position.x;
+    const cy = wrapper.position.y;
+    const cz = wrapper.position.z;
+    const initialRotZ = wrapper.rotation.z;
+    const initialScale = wrapper.scale.x;
 
-    function frame(now){
-      const elapsed = now - startTime;
+    // config: orbit radius (local), number of revolutions, durations (ms)
+    const radius = 0.12;          // orbit radius in local units (adjustable)
+    const revolutions = 2;        // how many circles
+    const orbitDuration = 900;    // ms total for orbit phase
+    const approachDur = 140;      // move into orbit from slightly farther
+    const retreatDur = 140;       // move back to start and finish
+    const totalOrbitTime = orbitDuration;
+
+    // We'll do: approach -> orbit (revolutions) -> retreat
+    function frame(now) {
+      const elapsed = now - start;
+
+      // approach phase: move from slightly farther Z toward cz - 0.06 (closer)
       if (elapsed < approachDur) {
         const t = easeInOutQuad(elapsed / approachDur);
-        wrapper.position.z = lerp(initial.z, initial.z - 0.12, t);
+        wrapper.position.z = lerp(cz + 0.05, cz - 0.06, t); // come closer a bit
+        // slight tilt change
+        wrapper.rotation.x = lerp(wrapper.rotation.x, wrapper.rotation.x - 0.05, t);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approachDur + strokeDur) {
-        const t = (elapsed - approachDur) / strokeDur;
-        const tt = easeInOutQuad(t);
-        wrapper.rotation.z = initial.rotZ + 0.45 * Math.sin(tt * Math.PI);
-        wrapper.position.x = lerp(initial.x, initial.x - 0.18, tt);
+
+      const orbitStart = approachDur;
+      const orbitEnd = approachDur + totalOrbitTime;
+
+      // orbit phase
+      if (elapsed >= orbitStart && elapsed < orbitEnd) {
+        const t = (elapsed - orbitStart) / (orbitEnd - orbitStart); // 0..1 through orbit
+        const eased = easeInOutQuad(t);
+        const angle = eased * revolutions * Math.PI * 2; // radians progressed
+        // compute circular position in local coordinates (around tooth center)
+        const ox = cx + Math.cos(angle) * radius;
+        const oy = cy + Math.sin(angle) * (radius * 0.45); // elliptical: less vertical radius
+        // slight vertical bob to simulate contact
+        const contact = 0.02 * Math.sin(angle * 4); // small wiggle
+        wrapper.position.x = ox;
+        wrapper.position.y = oy - Math.abs(contact); // dip slightly on contact parts
+        // rotate brush head a bit to follow motion for realism
+        wrapper.rotation.z = initialRotZ + Math.sin(angle) * 0.25;
+        wrapper.rotation.x = -0.85 + Math.cos(angle * 2) * 0.06;
+        // maybe a tiny scale pulse to suggest pressure
+        wrapper.scale.setScalar(initialScale * (1 + 0.02 * Math.sin(angle * 3)));
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approachDur + 2*strokeDur) {
-        const t2 = (elapsed - (approachDur + strokeDur)) / strokeDur;
+
+      // retreat phase: move back to original local pos and rotation
+      if (elapsed >= orbitEnd && elapsed < orbitEnd + retreatDur) {
+        const t2 = (elapsed - orbitEnd) / retreatDur;
         const tt2 = easeInOutQuad(t2);
-        wrapper.rotation.z = lerp(initial.rotZ + 0.45, initial.rotZ - 0.25, Math.sin(tt2 * Math.PI));
-        wrapper.position.x = lerp(initial.x - 0.18, initial.x + 0.06, tt2);
+        // interpolate position from current to original (cx,cy,cz)
+        wrapper.position.x = lerp(wrapper.position.x, cx, tt2);
+        wrapper.position.y = lerp(wrapper.position.y, cy, tt2);
+        wrapper.position.z = lerp(wrapper.position.z, cz, tt2);
+        // reset rotation & scale
+        wrapper.rotation.z = lerp(wrapper.rotation.z, initialRotZ, tt2);
+        wrapper.rotation.x = lerp(wrapper.rotation.x, -0.85, tt2);
+        wrapper.scale.setScalar(lerp(wrapper.scale.x, initialScale, tt2));
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approachDur + 2*strokeDur + retreatDur) {
-        const t3 = (elapsed - (approachDur + 2*strokeDur)) / retreatDur;
-        const tt3 = easeInOutQuad(t3);
-        wrapper.position.z = lerp(initial.z - 0.12, initial.z, tt3);
-        wrapper.position.x = lerp(initial.x + 0.06, initial.x, tt3);
-        wrapper.rotation.z = lerp(initial.rotZ - 0.25, initial.rotZ, tt3);
-        requestAnimationFrame(frame);
-        return;
-      }
+
+      // done
       resolve();
     }
+
     requestAnimationFrame(frame);
   });
 }
