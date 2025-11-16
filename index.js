@@ -60,11 +60,11 @@ function initThree() {
 
   // ---- LIGHTING ----
   // ambient low so we have contrast
-  const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.18);
   scene.add(ambient);
 
   // directional key light
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
   dir.position.set(1.5, 3, 2);
   dir.castShadow = true;
   dir.shadow.mapSize.width = 1024;
@@ -377,3 +377,4 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
