@@ -238,7 +238,7 @@ async function runInteractorAnimation(action) {
   } else if (action === 'healthy') {
     // wortel: start high above and a bit in front (will fall)
     localStart.set(0.0, 1.6, 0.9);
-    localRot.set(-0.25, 0, 0.5);
+    localRot.set(-0.25, 0, -0.5);
     localScale.set(0.34,0.34,0.34); // slightly smaller
   } else if (action === 'sweet') {
     // permen: start higher & further, small
@@ -690,6 +690,7 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
 
 
 
