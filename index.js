@@ -1,4 +1,4 @@
-// index.js (updated) - waits for interactor animation then notifies UI
+// index.js (final merged) - fixes: relative scale for carrot/candy, fade-out, wait-for-animation flow
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -84,6 +84,8 @@ function initThree() {
   spotLight.position.set(0.6, 1.8, 0.6);
   spotLight.target.position.set(0, 0, 0);
   spotLight.castShadow = true;
+  spotLight.shadow.mapSize.width = 1024;
+  spotLight.shadow.mapSize.height = 1024;
   scene.add(spotLight);
   scene.add(spotLight.target);
 
@@ -105,12 +107,10 @@ function initThree() {
   window.addEventListener('resize', onWindowResize);
 
   // IMPORTANT: listen for "ui-action-request" instead of instantly changing health
-  // UI will request an action; index.js will run animation and AFTER animation finishes
-  // we dispatch 'interactor-finished' so UI updates bars and then dispatches 'health-changed'.
   window.addEventListener('ui-action-request', async (e) => {
     const action = e.detail && e.detail.action ? e.detail.action : e.detail || null;
     if (!action || !objectPlaced) {
-      // still notify UI that animation couldn't run (so UI can re-enable)
+      // notify UI that animation couldn't run
       window.dispatchEvent(new CustomEvent('interactor-finished', { detail: { action, status: 'skipped' } }));
       return;
     }
@@ -124,7 +124,7 @@ function initThree() {
     }
   });
 
-  // UI still dispatches health-changed when it updates values (after it receives interactor-finished)
+  // UI dispatches health-changed after it updates values (upon interactor-finished)
   window.addEventListener('health-changed', (e) => {
     const health = e.detail && typeof e.detail.health === 'number' ? e.detail.health : null;
     if (health === null) return;
@@ -168,7 +168,7 @@ function applyMeshMaterialTweaks(model) {
         if ('metalness' in mat) mat.metalness = Math.min(0.05, mat.metalness || 0);
         if ('roughness' in mat) mat.roughness = Math.min(0.9, (mat.roughness === undefined ? 0.6 : mat.roughness));
         mat.side = THREE.DoubleSide;
-        mat.transparent = true; // enable transparency for fade-outs (interactors)
+        mat.transparent = true; // enable transparency for fade-outs
         mat.needsUpdate = true;
       }
     }
@@ -330,12 +330,13 @@ function animateBrush(wrapper) {
   });
 }
 
-// animate carrot with fade-out (fall -> small bounce -> fade)
+// --- FIXED: animate carrot with fade-out (fall -> bounce -> fade) using initialScale
 function animateCarrotFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
     const startY = wrapper.position.y;
     const startZ = wrapper.position.z;
+    const initialScale = wrapper.scale.x;    // capture initial scale
     const fall = 420; // fall time
     const bounce = 180;
     const fade = 260;
@@ -347,7 +348,7 @@ function animateCarrotFade(wrapper) {
       const elapsed = now - start;
       if (elapsed < fall) {
         const t = Math.min(1, elapsed / fall);
-        const tt = t * t;
+        const tt = t * t; // ease-in for gravity feel
         wrapper.position.y = lerp(startY, startY - 1.05, tt);
         wrapper.position.z = lerp(startZ, startZ - 0.45, tt);
         requestAnimationFrame(frame);
@@ -355,8 +356,10 @@ function animateCarrotFade(wrapper) {
       }
       if (elapsed < fall + bounce) {
         const t2 = (elapsed - fall) / bounce;
-        const pulse = Math.sin(t2 * Math.PI);
-        wrapper.scale.setScalar(lerp(0.9, 1.02, pulse));
+        const pulse = Math.sin(t2 * Math.PI); // 0..1..0
+        // scale relative to initialScale (no absolute jump)
+        const scaleFactor = lerp(0.9, 1.02, pulse);
+        wrapper.scale.setScalar(initialScale * scaleFactor);
         wrapper.position.y = lerp(startY - 1.05, startY - 0.92, pulse * 0.6);
         requestAnimationFrame(frame);
         return;
@@ -370,6 +373,8 @@ function animateCarrotFade(wrapper) {
         });
         // slight upward move while fading
         wrapper.position.y = lerp(startY - 0.92, startY + 0.45, tt3);
+        // shrink relative to initial
+        wrapper.scale.setScalar(initialScale * lerp(1.02, 0.02, tt3));
         requestAnimationFrame(frame);
         return;
       }
@@ -379,16 +384,16 @@ function animateCarrotFade(wrapper) {
   });
 }
 
-// animate candy with fade-out (fall -> sticky pulse -> fade)
+// --- FIXED: animate candy with fade-out using initialScale
 function animateCandyFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
     const startY = wrapper.position.y;
     const startZ = wrapper.position.z;
+    const initialScale = wrapper.scale.x; // capture initial scale
     const fall = 320;
     const stick = 260;
     const fade = 220;
-    const initialScale = wrapper.scale.x;
 
     // set initial material opacity to 1
     wrapper.traverse((c) => { if (c.isMesh && c.material) c.material.opacity = 1.0; });
@@ -417,6 +422,7 @@ function animateCandyFade(wrapper) {
           if (c.isMesh && c.material) c.material.opacity = 1 - tt3;
         });
         wrapper.position.y = lerp(startY - 1.05, startY + 0.6, tt3);
+        wrapper.scale.setScalar(initialScale * lerp(1.14, 0.01, tt3));
         requestAnimationFrame(frame);
         return;
       }
@@ -426,7 +432,7 @@ function animateCandyFade(wrapper) {
   });
 }
 
-// ---- Swap model AFTER UI dispatches health-changed (but DO NOT scale out/in anymore) ----
+// ---- Swap model AFTER UI dispatches health-changed (no scale out/in) ----
 function swapModelForHealthAfterDelay(healthKey) {
   const modelFile = MODEL_MAP[healthKey];
   if (!modelFile) return;
@@ -443,7 +449,7 @@ function swapModelForHealthAfterDelay(healthKey) {
   const cached = modelCache[modelFile];
 
   (async () => {
-    // simple approach: replace model immediately but no fancy scale animation.
+    // replace model immediately (no fancy scale animation).
     if (placedObject) {
       try { scene.remove(placedObject); disposeObject(placedObject); } catch (e) {}
       placedObject = null;
