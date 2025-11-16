@@ -1,4 +1,4 @@
-/* ui.js (updated with final-state lock + reset button) */
+/* ui.js (updated) — updates bars only after interactor animation finishes) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -36,7 +36,6 @@
     resetBtnEl = document.createElement('button');
     resetBtnEl.id = 'resetBtn';
     resetBtnEl.textContent = 'Reset';
-    // basic styling (you can move to CSS)
     Object.assign(resetBtnEl.style, {
       position: 'absolute',
       bottom: '18px',
@@ -85,16 +84,30 @@
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
     setButtonsEnabled(true);
     updateBars();
-    // sync AR with current health
+  });
+
+  // handle interactor finished notifications from index.js
+  // detail: { action: 'brush'|'healthy'|'sweet', status: 'ok'|'skipped'|'error' }
+  window.addEventListener('interactor-finished', (e) => {
+    const d = e.detail || {};
+    const action = d.action;
+    const status = d.status;
+    // if cancelled/skipped/error -> re-enable buttons unless terminal
+    if (status !== 'ok') {
+      fadeInfo(status === 'skipped' ? "Animasi tidak dijalankan." : "Terjadi error animasi.");
+      safeEnableButtonsIfNotTerminal();
+      return;
+    }
+    // perform actual state change AFTER animation finished
+    performActionEffect(action);
+    // update UI & dispatch health-changed for model swap
+    updateBars();
     window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue } }));
+    // check terminal condition and either enable buttons or show reset
+    checkTerminalState();
   });
 
-  // handle UI-driven reset from elsewhere (if needed)
-  window.addEventListener('perform-ui-reset', () => {
-    onResetClicked();
-  });
-
-  // button handlers
+  // button handlers now REQUEST animation (do not change values immediately)
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
@@ -102,13 +115,11 @@
         fadeInfo("Model belum siap. Arahkan kamera & tunggu model muncul.");
         return;
       }
-      handleAction(action);
-      // notify AR general action (optional)
-      window.dispatchEvent(new CustomEvent('ui-action', { detail: action }));
-      // always notify AR of health update so it can swap model
-      window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue } }));
-      // check terminal condition after update
-      checkTerminalState();
+
+      // request animation from index.js, UI disables buttons and waits for 'interactor-finished'
+      setButtonsEnabled(false);
+      fadeInfo("Memainkan animasi...");
+      window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action } }));
     });
   });
 
@@ -118,7 +129,7 @@
     setTimeout(() => {
       info.textContent = text;
       info.style.opacity = 1;
-    }, 180);
+    }, 160);
   }
 
   function updateBars() {
@@ -126,20 +137,18 @@
     if (healthFill) healthFill.style.width = clamp100(healthValue) + "%";
   }
 
-  function handleAction(action) {
+  // this performs the actual effect to cleanValue/healthValue (called AFTER animation)
+  function performActionEffect(action) {
     switch(action) {
       case 'brush':
-        // Brush: langsung +25 kebersihan & +25 kesehatan
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
-        // brushing should reset sweet/healthy counters
         sweetCount = 0;
         healthyCount = 0;
-        fadeInfo("🪥 Kamu menggosok gigi: kebersihan +25%, kesehatan +25%!");
+        fadeInfo("🪥 Menggosok gigi selesai — kebersihan +25%, kesehatan +25%!");
         break;
 
       case 'sweet':
-        // Sweet: kebersihan -12.5; setiap 2x -> health -25
         cleanValue = clamp100(cleanValue - 12.5);
         sweetCount++;
         if (sweetCount >= 2) {
@@ -152,7 +161,6 @@
         break;
 
       case 'healthy':
-        // Healthy food: kebersihan +12.5; after 2x -> health +25
         cleanValue = clamp100(cleanValue + 12.5);
         healthyCount++;
         if (healthyCount >= 2) {
@@ -165,41 +173,37 @@
         break;
 
       default:
-        console.warn('Unknown action', action);
+        console.warn('Unknown action to perform effect:', action);
         return;
     }
+  }
 
-    // clamp and update bars
-    cleanValue = clamp100(cleanValue);
-    healthValue = clamp100(healthValue);
-    updateBars();
-
-    // final messages for extremes
-    if (healthValue <= 0) {
-      fadeInfo("💀 Gigi rusak total! Sikat gigi untuk memulihkan.");
-    } else if (healthValue >= 100 && cleanValue >= 100) {
-      fadeInfo("✨ Gigi sangat sehat dan bersih!");
+  function safeEnableButtonsIfNotTerminal() {
+    const terminal = (cleanValue <= 0 && healthValue <= 0);
+    if (!terminal) setButtonsEnabled(true);
+    else {
+      // leave locked and show reset
+      createResetButton();
     }
   }
 
   function checkTerminalState() {
-    // Terminal condition: both cleanliness and health are 0
     if (cleanValue <= 0 && healthValue <= 0) {
-      // Lock all action buttons
+      // Terminal condition: lock, show irreversible message and reset button
       setButtonsEnabled(false);
-
-      // show irreversible damage message
       fadeInfo("⚠️ Gigi sudah rusak parah — struktur gigi rusak, infeksi mencapai ujung akar. Perawatan terakhir: saluran akar atau pencabutan. Tidak bisa diperbaiki di aplikasi ini.");
-
-      // show reset button so user can restart
       createResetButton();
+    } else {
+      // not terminal -> enable buttons again
+      setButtonsEnabled(true);
     }
   }
 
   // expose for debugging
   window.kariesUI = {
     _getState: () => ({ cleanValue, healthValue, sweetCount, healthyCount }),
-    setAction: (a) => handleAction(a),
+    // kept for compatibility (will request animations)
+    setActionRequest: (a) => { window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action: a } })); },
     updateBars, fadeInfo, setButtonsEnabled, createResetButton, removeResetButton
   };
 })();
