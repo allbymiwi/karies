@@ -237,12 +237,12 @@ async function runInteractorAnimation(action) {
     localScale.set(0.55,0.55,0.55);  // suitable brush size
   } else if (action === 'healthy') {
     // wortel: start high above and a bit in front (will fall)
-    localStart.set(0.0, 1.6, 0.9);
+    localStart.set(0.0, 1.6, 0.65);
     localRot.set(-0.25, 0, -0.5);
     localScale.set(0.40,0.40,0.40); // slightly smaller
   } else if (action === 'sweet') {
     // permen: start higher & further, small
-    localStart.set(0.08, 1.8, 0.95);
+    localStart.set(0.08, 1.8, 0.7);
     localRot.set(0, 0.4, 0.8);
     localScale.set(0.32,0.32,0.32); // smaller
   }
@@ -690,6 +690,7 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
 
 
 
