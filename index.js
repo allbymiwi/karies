@@ -1,9 +1,4 @@
-// index.js (full, updated: animated swap + interactor start tweaks)
-// Requirements:
-// - modules/three.module.js
-// - modules/GLTFLoader.js
-// - gigisehat.glb, gigiplak.glb, gigiasam.glb, gigidemineralisasi.glb, gigikaries.glb
-// - sikatgigi.glb, wortel.glb, permen.glb
+// index.js (final) - integrated with falling interactors & animated swap
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -182,7 +177,7 @@ function preloadAllModelsAndInteractors() {
           const node = gltf.scene || gltf.scenes[0];
           if (!node) { resolve(); return; }
           applyMeshMaterialTweaks(node);
-          // store into appropriate cache (store original)
+          // store into appropriate cache
           if (Object.values(MODEL_MAP).includes(file)) modelCache[file] = node;
           if (Object.values(INTERACTORS).includes(file)) {
             const actionKey = Object.keys(INTERACTORS).find(k => INTERACTORS[k] === file);
@@ -192,7 +187,7 @@ function preloadAllModelsAndInteractors() {
         },
         undefined,
         (err) => {
-          console.warn('preload failed for', file, err);
+          console.warn('preload failed', file, err);
           resolve(); // don't block
         }
       );
@@ -205,8 +200,10 @@ function preloadAllModelsAndInteractors() {
 async function runInteractorAnimation(action) {
   const file = INTERACTORS[action];
   if (!file) return;
-  // disable UI buttons while interact anim runs
+
+  // disable UI buttons while interact anim runs (UI will re-enable if allowed)
   try { window.kariesUI?.setButtonsEnabled(false); } catch (e) {}
+
   let interactorRoot = null;
   const cached = interactorCache[action];
   if (cached) interactorRoot = cached.clone(true);
@@ -223,29 +220,29 @@ async function runInteractorAnimation(action) {
     return;
   }
 
-  // set initial local transform depending on action (adjusted: further away & smaller)
+  // set initial local transform depending on action (adjusted: falling from above for food)
   const localStart = new THREE.Vector3();
   const localRot = new THREE.Euler();
   const localScale = new THREE.Vector3(1,1,1);
 
   if (action === 'brush') {
-    // sikat sedikit lebih dekat and proportionate
-    localStart.set(0.42, 0.04, 0.32);
+    // sikat: a bit above/front for clear stroke
+    localStart.set(0.42, 0.20, 0.32);
     localRot.set(-0.6, 0.6, -1.2);
-    localScale.set(0.75,0.75,0.75);
+    localScale.set(0.65,0.65,0.65);
   } else if (action === 'healthy') {
-    // wortel: start further front and smaller
-    localStart.set(0, 0.45, 1.05);
-    localRot.set(-0.12, 0, 0);
-    localScale.set(0.45,0.45,0.45);
+    // wortel: start high above and a bit in front (will fall)
+    localStart.set(0.0, 1.6, 0.9);
+    localRot.set(-0.25, 0, 0);
+    localScale.set(0.38,0.38,0.38); // smaller
   } else if (action === 'sweet') {
-    // permen: start higher & further
-    localStart.set(0.12, 0.7, 1.05);
+    // permen: start higher & further, small
+    localStart.set(0.08, 1.8, 0.95);
     localRot.set(0, 0.4, 0.1);
-    localScale.set(0.35,0.35,0.35);
+    localScale.set(0.28,0.28,0.28); // smaller
   }
 
-  // create wrapper group so we can animate local transforms easily
+  // wrapper group to animate local transforms easily
   const wrapper = new THREE.Group();
   wrapper.position.copy(localStart);
   wrapper.rotation.copy(localRot);
@@ -254,6 +251,7 @@ async function runInteractorAnimation(action) {
 
   applyMeshMaterialTweaks(interactorRoot);
   wrapper.add(interactorRoot);
+  // attach to placedObject so wrapper local coords are relative to tooth
   placedObject.add(wrapper);
 
   // animate depending on action
@@ -272,8 +270,18 @@ async function runInteractorAnimation(action) {
     disposeObject(wrapper);
   } catch (e) { /* ignore */ }
 
-  // re-enable buttons
-  try { window.kariesUI?.setButtonsEnabled(true); } catch (e) {}
+  // re-enable buttons only if UI not in terminal state
+  try {
+    const state = window.kariesUI && typeof window.kariesUI._getState === 'function' ? window.kariesUI._getState() : null;
+    const terminal = state && (state.cleanValue <= 0 && state.healthValue <= 0);
+    if (!terminal) {
+      window.kariesUI?.setButtonsEnabled(true);
+    } else {
+      console.log('UI is terminal — leaving buttons locked after interactor.');
+    }
+  } catch (e) {
+    try { window.kariesUI?.setButtonsEnabled(true); } catch (err) {}
+  }
 
   return;
 }
@@ -286,12 +294,7 @@ function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
 function animateBrush(wrapper) {
   return new Promise((resolve) => {
     const startTime = performance.now();
-    const initial = {
-      x: wrapper.position.x,
-      y: wrapper.position.y,
-      z: wrapper.position.z,
-      rotZ: wrapper.rotation.z
-    };
+    const initial = { x: wrapper.position.x, y: wrapper.position.y, z: wrapper.position.z, rotZ: wrapper.rotation.z };
     const approachDur = 120;
     const strokeDur = 370;
     const retreatDur = 120;
@@ -335,39 +338,39 @@ function animateBrush(wrapper) {
   });
 }
 
-// animate carrot (wortel): start further out, move in, bite, retreat
+// animate carrot: fall from above, pop, vanish
 function animateCarrot(wrapper) {
   return new Promise((resolve) => {
-    const startTime = performance.now();
-    const initialZ = wrapper.position.z;
-    const initialY = wrapper.position.y;
-    const approach = 420; // longer because start further
-    const bite = 180;
-    const out = 220;
+    const start = performance.now();
+    const startY = wrapper.position.y;
+    const startZ = wrapper.position.z;
+    const approach = 420; // fall time
+    const pop = 180;      // pop/bounce
+    const out = 240;      // vanish
 
     function frame(now) {
-      const elapsed = now - startTime;
+      const elapsed = now - start;
       if (elapsed < approach) {
-        const t = easeInOutQuad(elapsed / approach);
-        wrapper.position.z = lerp(initialZ, initialZ - 0.65, t);
-        wrapper.position.y = lerp(initialY, initialY - 0.06, t);
+        const t = Math.min(1, elapsed / approach);
+        const tt = t * t; // ease-in for gravity feel
+        wrapper.position.y = lerp(startY, startY - 1.05, tt);
+        wrapper.position.z = lerp(startZ, startZ - 0.45, tt);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approach + bite) {
-        const t2 = (elapsed - approach) / bite;
-        const tt = Math.sin(t2 * Math.PI);
-        wrapper.position.y = lerp(initialY - 0.06, initialY - 0.02, tt);
-        wrapper.scale.setScalar(lerp(0.9, 1.06, tt));
+      if (elapsed < approach + pop) {
+        const t2 = (elapsed - approach) / pop;
+        const pulse = Math.sin(t2 * Math.PI);
+        wrapper.scale.setScalar(lerp(0.9, 1.08, pulse));
+        wrapper.position.y = lerp(startY - 1.05, startY - 0.9, pulse * 0.6);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approach + bite + out) {
-        const t3 = (elapsed - approach - bite) / out;
+      if (elapsed < approach + pop + out) {
+        const t3 = (elapsed - approach - pop) / out;
         const tt3 = easeInOutQuad(t3);
-        wrapper.position.z = lerp(initialZ - 0.65, initialZ + 0.35, tt3);
-        wrapper.position.y = lerp(initialY - 0.02, initialY + 0.18, tt3);
-        wrapper.scale.setScalar(lerp(1.06, 0.72, tt3));
+        wrapper.scale.setScalar(lerp(1.08, 0.02, tt3));
+        wrapper.position.y = lerp(startY - 0.9, startY + 0.5, tt3);
         requestAnimationFrame(frame);
         return;
       }
@@ -377,38 +380,39 @@ function animateCarrot(wrapper) {
   });
 }
 
-// animate candy (permen): float in, stick pulse, disappear
+// animate candy: fall from above, stick pulse, vanish
 function animateCandy(wrapper) {
   return new Promise((resolve) => {
-    const startTime = performance.now();
-    const initialY = wrapper.position.y;
-    const initialZ = wrapper.position.z;
-    const initialS = wrapper.scale.x;
-    const approach = 360;
+    const start = performance.now();
+    const startY = wrapper.position.y;
+    const startZ = wrapper.position.z;
+    const fall = 320;
     const stick = 260;
-    const disappear = 260;
+    const vanish = 220;
+    const initialScale = wrapper.scale.x;
 
     function frame(now) {
-      const elapsed = now - startTime;
-      if (elapsed < approach) {
-        const t = easeInOutQuad(elapsed / approach);
-        wrapper.position.z = lerp(initialZ, initialZ - 0.55, t);
-        wrapper.position.y = lerp(initialY, initialY - 0.06, t);
+      const elapsed = now - start;
+      if (elapsed < fall) {
+        const t = Math.min(1, elapsed / fall);
+        const tt = t * t;
+        wrapper.position.y = lerp(startY, startY - 1.05, tt);
+        wrapper.position.z = lerp(startZ, startZ - 0.45, tt);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approach + stick) {
-        const t2 = (elapsed - approach) / stick;
-        const pulse = 1 + 0.12 * Math.sin(t2 * Math.PI * 3);
-        wrapper.scale.setScalar(initialS * pulse);
+      if (elapsed < fall + stick) {
+        const t2 = (elapsed - fall) / stick;
+        const pulse = 1 + 0.16 * Math.sin(t2 * Math.PI * 3);
+        wrapper.scale.setScalar(initialScale * pulse);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approach + stick + disappear) {
-        const t3 = (elapsed - approach - stick) / disappear;
+      if (elapsed < fall + stick + vanish) {
+        const t3 = (elapsed - fall - stick) / vanish;
         const tt3 = easeInOutQuad(t3);
-        wrapper.scale.setScalar(lerp(initialS * 1.12, 0.01, tt3));
-        wrapper.position.y = lerp(initialY - 0.06, initialY + 0.18, tt3);
+        wrapper.scale.setScalar(lerp(initialScale * 1.16, 0.01, tt3));
+        wrapper.position.y = lerp(startY - 1.05, startY + 0.6, tt3);
         requestAnimationFrame(frame);
         return;
       }
