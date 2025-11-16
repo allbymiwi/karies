@@ -101,7 +101,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 }
 
 /* XR button */
-.xr-btn {
+.xr-btn, #xrBtn {
   position: absolute;
   top: 8px;
   left: 8px;
