@@ -1,4 +1,5 @@
-// index.js (updated) - swap model file when health changes
+// index.js (with improved lighting & material tweaks)
+// Paste this file as ./index.js (module), keep modules/three.module.js and modules/GLTFLoader.js
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -10,7 +11,7 @@ const MODEL_MAP = {
   25:  'gigidemineralisasi.glb',
   0:   'gigikaries.glb'
 };
-const BASE_SCALE = 0.25; // ubah sesuai kebutuhan
+const BASE_SCALE = 0.25; // adjust as needed
 
 let renderer, scene, camera, gl;
 let controller, reticle;
@@ -28,6 +29,9 @@ const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
 
 const xrBtn = document.getElementById('xrBtn');
+
+// Lighting vars (make spot global so we can update in render)
+let spotLight = null;
 
 xrBtn.addEventListener('click', () => {
   if (!xrSession) requestXRSession();
@@ -47,10 +51,49 @@ function initThree() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearAlpha(0);
 
+  // enable shadows
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
   scene = new THREE.Scene();
 
-  // Reticle
+  // ---- LIGHTING ----
+  // ambient low so we have contrast
+  const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+  scene.add(ambient);
+
+  // directional key light
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(1.5, 3, 2);
+  dir.castShadow = true;
+  dir.shadow.mapSize.width = 1024;
+  dir.shadow.mapSize.height = 1024;
+  dir.shadow.camera.near = 0.1;
+  dir.shadow.camera.far = 20;
+  dir.shadow.camera.left = -2;
+  dir.shadow.camera.right = 2;
+  dir.shadow.camera.top = 2;
+  dir.shadow.camera.bottom = -2;
+  scene.add(dir);
+
+  // rim/fill point light behind model
+  const rim = new THREE.PointLight(0xfff6d8, 0.6, 6);
+  rim.position.set(-1.5, 1.5, -1.5);
+  scene.add(rim);
+
+  // spot light for focused highlight (global var so we can move it with camera)
+  spotLight = new THREE.SpotLight(0xffffff, 0.6, 6, Math.PI / 8, 0.3, 1);
+  spotLight.position.set(0.6, 1.8, 0.6);
+  spotLight.target.position.set(0, 0, 0);
+  spotLight.castShadow = true;
+  spotLight.shadow.mapSize.width = 1024;
+  spotLight.shadow.mapSize.height = 1024;
+  scene.add(spotLight);
+  scene.add(spotLight.target);
+  // ---- end lighting ----
+
+  // Reticle (ring)
   reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.15, 0.20, 32).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 })
@@ -58,9 +101,6 @@ function initThree() {
   reticle.matrixAutoUpdate = false;
   reticle.visible = false;
   scene.add(reticle);
-
-  const hemi = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-  scene.add(hemi);
 
   controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
@@ -88,6 +128,26 @@ function clampHealthKey(health) {
   if (health >= 50) return 50;
   if (health >= 25) return 25;
   return 0;
+}
+
+function applyMeshMaterialTweaks(model) {
+  // enable shadows and tweak PBR params for better contrast
+  model.traverse((c) => {
+    if (c.isMesh) {
+      c.castShadow = true;
+      c.receiveShadow = true;
+
+      const mat = c.material;
+      if (mat) {
+        // ensure PBR-friendly values (don't overwrite if already low/high)
+        if ('metalness' in mat) mat.metalness = Math.min(0.05, mat.metalness || 0);
+        if ('roughness' in mat) mat.roughness = Math.min(0.9, (mat.roughness === undefined ? 0.6 : mat.roughness));
+        // double side can help very thin parts; if model behaves oddly, remove this
+        mat.side = THREE.DoubleSide;
+        mat.needsUpdate = true;
+      }
+    }
+  });
 }
 
 function swapModelForHealth(healthKey) {
@@ -129,6 +189,9 @@ function swapModelForHealth(healthKey) {
       newModel.quaternion.copy(quat);
       newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
       newModel.userData.modelFile = modelFile;
+
+      // material/shadow tweaks
+      applyMeshMaterialTweaks(newModel);
 
       scene.add(newModel);
       placedObject = newModel;
@@ -220,7 +283,7 @@ function onSelect() {
     return;
   }
 
-  // initial place uses healthy model
+  // initial place uses healthy model (MODEL_MAP[100])
   reticle.matrix.decompose(_pos, _quat, _scale);
 
   loader.load(MODEL_MAP[100],
@@ -235,6 +298,9 @@ function onSelect() {
       model.quaternion.copy(_quat);
       model.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
       model.userData.modelFile = MODEL_MAP[100];
+
+      // tweak material & shadows for better detail
+      applyMeshMaterialTweaks(model);
 
       scene.add(model);
       placedObject = model;
@@ -283,6 +349,25 @@ function render(time, frame) {
         }
       } else {
         reticle.visible = false;
+      }
+    }
+
+    // update spotLight to follow camera a bit (optional: helps highlight)
+    if (spotLight && renderer.xr.isPresenting) {
+      try {
+        // get the active camera used by renderer.xr
+        const xrCamera = renderer.xr.getCamera(camera);
+        const camPos = new THREE.Vector3();
+        xrCamera.getWorldPosition(camPos);
+        // position slightly above & in front of camera
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(xrCamera.quaternion);
+        const upOffset = new THREE.Vector3(0, 0.45, 0);
+        const spotPos = camPos.clone().add(forward.clone().multiplyScalar(0.45)).add(upOffset);
+        spotLight.position.copy(spotPos);
+        spotLight.target.position.copy(camPos.clone().add(forward.clone().multiplyScalar(1.2)));
+        spotLight.target.updateMatrixWorld();
+      } catch (err) {
+        // ignore if camera not ready
       }
     }
   }
