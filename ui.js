@@ -1,4 +1,4 @@
-/* ui.js (updated) */
+/* ui.js (updated for health-changed event) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -10,35 +10,34 @@
   let healthValue = 100;
   let sweetCount = 0;
 
-  // initially disable action buttons until model ready
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
-      // visually and functionally enable/disable
       b.style.opacity = enabled ? '1' : '0.55';
       b.style.pointerEvents = enabled ? 'auto' : 'none';
       b.tabIndex = enabled ? 0 : -1;
-      if (enabled) b.removeAttribute('aria-disabled');
-      else b.setAttribute('aria-disabled', 'true');
+      if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
     });
   }
   setButtonsEnabled(false);
 
-  // Listen for model placed event (dispatched by index.js)
+  // notify AR UI that model is placed (listener in index.js will enable logic)
   window.addEventListener('model-placed', (ev) => {
     toothReady = true;
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
     setButtonsEnabled(true);
     updateBars();
+    // also send current health so AR can sync model if needed
+    window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue } }));
   });
 
-  // action buttons
+  // action buttons: update UI and dispatch ui-action for AR to react
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
-      // UI internal logic
-      setAction(action);
-      // dispatch event so AR/index.js can respond too
-      window.dispatchEvent(new CustomEvent('ui-action', { detail: action }));
+      setAction(action); // local UI update logic
+      window.dispatchEvent(new CustomEvent('ui-action', { detail: action })); // notify AR (optional)
+      // after state changes, notify AR of health change
+      window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue } }));
     });
   });
 
@@ -75,9 +74,9 @@
         sweetCount++;
         if (sweetCount >= 2) {
           sweetCount = 0;
-          healthValue -= 25;
+          healthValue -= 25; // 1 nyawa hilang
           document.querySelector('.health .bar-inner')?.classList.add('damage');
-          fadeInfo("⚠️ Terlalu sering makan manis! Kesehatan menurun!");
+          fadeInfo("🍭 Terlalu sering makan manis — kesehatan turun!");
           setTimeout(() => {
             document.querySelector('.health .bar-inner')?.classList.remove('damage');
           }, 500);
@@ -100,6 +99,6 @@
     }
   }
 
-  // Expose for debugging if needed
+  // expose for debugging
   window.kariesUI = { setAction, updateBars, fadeInfo, setButtonsEnabled };
 })();
