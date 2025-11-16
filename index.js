@@ -1,12 +1,12 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+// index.js — import from local modules folder
+import * as THREE from './modules/three.module.js';
+import { GLTFLoader } from './modules/GLTFLoader.js';
 
-const MODEL_PATH = 'asset/gigisehat.glb'; // pastikan file ada di folder yang sama
+const MODEL_PATH = './gigisehat.glb'; // pastikan file ada di folder yang sama
 
 let renderer, scene, camera, gl;
 let controller, reticle;
 let loader;
-
 let xrSession = null;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
@@ -14,22 +14,22 @@ let hitTestSourceRequested = false;
 let objectPlaced = false;
 let placedObject = null;
 
-// temp vectors for matrix decomposition
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
 
-function setupScene() {
-  const canvas = document.getElementById('canvas');
+const xrBtn = document.getElementById('xrBtn');
+xrBtn.addEventListener('click', () => {
+  if (!xrSession) requestXRSession();
+  else endXRSession();
+});
 
-  // WebGL2 context
+function initThree() {
+  const canvas = document.getElementById('canvas');
   gl = canvas.getContext('webgl2', { antialias: true });
   if (!gl) {
-    console.error('WebGL2 tidak tersedia di browser ini.');
-    alert('Browser tidak mendukung WebGL2. Coba di perangkat lain atau update browser.');
-    return;
+    alert('WebGL2 tidak tersedia di browser ini — AR mungkin tidak berjalan.');
   }
-
   renderer = new THREE.WebGLRenderer({ canvas: canvas, context: gl, alpha: true });
   renderer.xr.enabled = true;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -37,10 +37,9 @@ function setupScene() {
   renderer.setClearAlpha(0);
 
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
-
   scene = new THREE.Scene();
 
-  // reticle (ring)
+  // Reticle
   reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.15, 0.20, 32).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 })
@@ -53,54 +52,27 @@ function setupScene() {
   const hemi = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
   scene.add(hemi);
 
-  // controller for select
+  // controller
   controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
   scene.add(controller);
 
   loader = new GLTFLoader();
 
-  window.addEventListener('resize', onWindowResize);
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 
-  console.log('Scene setup complete.');
+  console.log('Script loaded. Ready.');
 }
 
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-async function initXRButton() {
+async function requestXRSession() {
   try {
-    if (!('xr' in navigator)) {
-      console.warn('WebXR tidak tersedia di browser ini.');
-      return;
-    }
+    if (!('xr' in navigator)) throw new Error('WebXR tidak tersedia di browser ini.');
     const supported = await navigator.xr.isSessionSupported('immersive-ar');
-    console.log('immersive-ar supported?', supported);
-    if (supported) {
-      const btn = document.createElement('button');
-      btn.textContent = 'Enter XR';
-      btn.style.position = 'absolute';
-      btn.style.top = '10px';
-      btn.style.left = '10px';
-      btn.style.zIndex = 100;
-      btn.addEventListener('click', () => {
-        if (!xrSession) requestSession();
-        else endSession();
-      });
-      document.body.appendChild(btn);
-    } else {
-      console.log('immersive-ar not supported on this device/browser.');
-    }
-  } catch (err) {
-    console.error('Error checking XR support', err);
-  }
-}
-
-async function requestSession() {
-  try {
+    if (!supported) throw new Error('immersive-ar tidak didukung di device/browser ini.');
     const session = await navigator.xr.requestSession('immersive-ar', {
       requiredFeatures: ['hit-test'],
       optionalFeatures: ['local-floor', 'dom-overlay'],
@@ -108,55 +80,46 @@ async function requestSession() {
     });
     onSessionStarted(session);
   } catch (err) {
-    console.error('requestSession failed', err);
-    alert('Gagal memulai session AR: ' + err.message);
+    console.error('requestXRSession failed:', err);
+    alert('Gagal memulai AR: ' + err.message);
   }
 }
 
 async function onSessionStarted(session) {
   xrSession = session;
-  // make XR-compatible and set base layer
+  xrBtn.textContent = 'STOP AR';
   await gl.makeXRCompatible();
-  xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
-
+  session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
   renderer.xr.setReferenceSpaceType('local');
-  renderer.xr.setSession(xrSession);
+  renderer.xr.setSession(session);
 
-  xrSession.addEventListener('end', onSessionEnded);
+  session.addEventListener('end', onSessionEnded);
 
-  // start rendering loop
+  hitTestSourceRequested = false;
+  hitTestSource = null;
+
   renderer.setAnimationLoop(render);
-  console.log('XR session started');
 }
 
 function onSessionEnded() {
   xrSession = null;
+  xrBtn.textContent = 'Enter AR';
   hitTestSourceRequested = false;
   hitTestSource = null;
   renderer.setAnimationLoop(null);
-  console.log('XR session ended');
 }
 
-function endSession() {
+function endXRSession() {
   if (!xrSession) return;
-  xrSession.end().catch(err => console.warn('end failed', err));
+  xrSession.end().catch(e => console.warn('end XR failed', e));
 }
 
-// onSelect: place the GLB exactly ONCE at the reticle
 function onSelect() {
-  if (!reticle.visible) {
-    console.log('Select ignored: reticle not visible.');
+  if (!reticle.visible || objectPlaced) {
+    console.log('select ignored (reticle.visible=%s objectPlaced=%s)', reticle.visible, objectPlaced);
     return;
   }
-  if (objectPlaced) {
-    console.log('Select ignored: object already placed.');
-    return;
-  }
-
-  // decompose reticle matrix to pos/quat/scale
   reticle.matrix.decompose(_pos, _quat, _scale);
-
-  console.log('Placing model at', _pos);
 
   loader.load(MODEL_PATH,
     (gltf) => {
@@ -164,23 +127,19 @@ function onSelect() {
       model.position.copy(_pos);
       model.quaternion.copy(_quat);
 
-      // tweak scale jika perlu (ubah nilai jika model terlalu besar/kecil)
-      const BASE_SCALE = 0.5;
+      const BASE_SCALE = 0.5; // ubah kalau perlu
       model.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
 
       scene.add(model);
       placedObject = model;
       objectPlaced = true;
-
-      // hide reticle after placing
       reticle.visible = false;
-
       console.log('Model placed.');
     },
     undefined,
     (err) => {
-      console.error('Error loading model:', err);
-      alert('Gagal load model. Cek console (404 / CORS).');
+      console.error('Error loading model', err);
+      alert('Gagal load model. Cek console.');
     }
   );
 }
@@ -192,15 +151,13 @@ function render(time, frame) {
 
     if (!hitTestSourceRequested) {
       session.requestReferenceSpace('viewer')
-        .then((viewerSpace) => session.requestHitTestSource({ space: viewerSpace }))
-        .then((source) => {
+        .then(viewerSpace => session.requestHitTestSource({ space: viewerSpace }))
+        .then(source => {
           hitTestSource = source;
           hitTestSourceRequested = true;
           console.log('hitTestSource ready');
         })
-        .catch((err) => {
-          console.warn('hit test request failed', err);
-        });
+        .catch(err => console.warn('hit test request failed', err));
     }
 
     if (hitTestSource && !objectPlaced) {
@@ -217,12 +174,8 @@ function render(time, frame) {
       }
     }
   }
-
   renderer.render(scene, camera);
 }
 
 // init
-setupScene();
-initXRButton();
-
-console.log('Script loaded. Pastikan gigisehat.glb ada di folder yang sama dan buka melalui localhost/https.');
+initThree();
