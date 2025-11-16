@@ -7,14 +7,17 @@
   <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-  <!-- Header / Buttons -->
-  <header><h3 style="margin:8px 0 0 12px;color:#fff">kARies - AR Edukasi Gigi</h3></header>
+  <header>
+    <h3 style="margin:8px 0 0 12px;color:#fff">kARies - AR Edukasi Gigi</h3>
+  </header>
+
+  <!-- XR Button -->
   <button id="xrBtn" class="xr-btn">Enter AR</button>
 
-  <!-- AR canvas (Three.js renderer will use this) -->
+  <!-- AR canvas -->
   <canvas id="canvas"></canvas>
 
-  <!-- UI Overlay (mirip contoh A-Frame) -->
+  <!-- UI overlay -->
   <div id="ui">
     <div id="bars">
       <div class="status-bar clean">
@@ -50,9 +53,10 @@
     </div>
   </div>
 
+  <!-- UI logic must load BEFORE AR logic so listeners are ready -->
+  <script src="./ui.js"></script>
+
   <!-- AR logic (module) -->
   <script type="module" src="./index.js"></script>
-  <!-- UI logic -->
-  <script src="./ui.js"></script>
 </body>
 </html>
