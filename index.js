@@ -1,4 +1,4 @@
-// index.js (final) - integrated with falling interactors & animated swap
+// index.js (updated) - waits for interactor animation then notifies UI
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -84,8 +84,6 @@ function initThree() {
   spotLight.position.set(0.6, 1.8, 0.6);
   spotLight.target.position.set(0, 0, 0);
   spotLight.castShadow = true;
-  spotLight.shadow.mapSize.width = 1024;
-  spotLight.shadow.mapSize.height = 1024;
   scene.add(spotLight);
   scene.add(spotLight.target);
 
@@ -106,16 +104,36 @@ function initThree() {
 
   window.addEventListener('resize', onWindowResize);
 
-  // listen for UI health updates (swap tooth)
+  // IMPORTANT: listen for "ui-action-request" instead of instantly changing health
+  // UI will request an action; index.js will run animation and AFTER animation finishes
+  // we dispatch 'interactor-finished' so UI updates bars and then dispatches 'health-changed'.
+  window.addEventListener('ui-action-request', async (e) => {
+    const action = e.detail && e.detail.action ? e.detail.action : e.detail || null;
+    if (!action || !objectPlaced) {
+      // still notify UI that animation couldn't run (so UI can re-enable)
+      window.dispatchEvent(new CustomEvent('interactor-finished', { detail: { action, status: 'skipped' } }));
+      return;
+    }
+    try {
+      await runInteractorAnimation(action);
+      // notify UI that animation finished successfully
+      window.dispatchEvent(new CustomEvent('interactor-finished', { detail: { action, status: 'ok' } }));
+    } catch (err) {
+      console.warn('interactor anim error', err);
+      window.dispatchEvent(new CustomEvent('interactor-finished', { detail: { action, status: 'error' } }));
+    }
+  });
+
+  // UI still dispatches health-changed when it updates values (after it receives interactor-finished)
   window.addEventListener('health-changed', (e) => {
     const health = e.detail && typeof e.detail.health === 'number' ? e.detail.health : null;
     if (health === null) return;
     const key = clampHealthKey(health);
     currentHealthModelKey = key;
-    if (objectPlaced) swapModelForHealth(key);
+    if (objectPlaced) swapModelForHealthAfterDelay(key);
   });
 
-  // listen reset event from UI
+  // reset listener
   window.addEventListener('reset', () => {
     console.log('Reset event received - removing placed model and resetting AR state.');
     if (placedObject) {
@@ -125,15 +143,6 @@ function initThree() {
     }
     objectPlaced = false;
     currentHealthModelKey = DEFAULT_HEALTH_KEY;
-  });
-
-  // listen ui-action to spawn interactor animations
-  window.addEventListener('ui-action', (e) => {
-    const action = e.detail;
-    if (!action || !objectPlaced) return;
-    if (action === 'brush' || action === 'healthy' || action === 'sweet') {
-      runInteractorAnimation(action).catch(err => console.warn('interactor anim error', err));
-    }
   });
 
   console.log('index.js loaded. Ready.');
@@ -159,6 +168,7 @@ function applyMeshMaterialTweaks(model) {
         if ('metalness' in mat) mat.metalness = Math.min(0.05, mat.metalness || 0);
         if ('roughness' in mat) mat.roughness = Math.min(0.9, (mat.roughness === undefined ? 0.6 : mat.roughness));
         mat.side = THREE.DoubleSide;
+        mat.transparent = true; // enable transparency for fade-outs (interactors)
         mat.needsUpdate = true;
       }
     }
@@ -177,7 +187,7 @@ function preloadAllModelsAndInteractors() {
           const node = gltf.scene || gltf.scenes[0];
           if (!node) { resolve(); return; }
           applyMeshMaterialTweaks(node);
-          // store into appropriate cache
+          // store into appropriate cache (store original)
           if (Object.values(MODEL_MAP).includes(file)) modelCache[file] = node;
           if (Object.values(INTERACTORS).includes(file)) {
             const actionKey = Object.keys(INTERACTORS).find(k => INTERACTORS[k] === file);
@@ -187,7 +197,7 @@ function preloadAllModelsAndInteractors() {
         },
         undefined,
         (err) => {
-          console.warn('preload failed', file, err);
+          console.warn('preload failed for', file, err);
           resolve(); // don't block
         }
       );
@@ -201,9 +211,7 @@ async function runInteractorAnimation(action) {
   const file = INTERACTORS[action];
   if (!file) return;
 
-  // disable UI buttons while interact anim runs (UI will re-enable if allowed)
-  try { window.kariesUI?.setButtonsEnabled(false); } catch (e) {}
-
+  // Note: UI already disabled buttons upon request; index.js does not re-enable here.
   let interactorRoot = null;
   const cached = interactorCache[action];
   if (cached) interactorRoot = cached.clone(true);
@@ -215,12 +223,9 @@ async function runInteractorAnimation(action) {
     interactorRoot = gltf.scene || gltf.scenes[0];
   }
 
-  if (!placedObject) {
-    try { window.kariesUI?.setButtonsEnabled(true); } catch (e) {}
-    return;
-  }
+  if (!placedObject) return;
 
-  // set initial local transform depending on action (adjusted: falling from above for food)
+  // set initial local transform depending on action (fall from above for food)
   const localStart = new THREE.Vector3();
   const localRot = new THREE.Euler();
   const localScale = new THREE.Vector3(1,1,1);
@@ -234,12 +239,12 @@ async function runInteractorAnimation(action) {
     // wortel: start high above and a bit in front (will fall)
     localStart.set(0.0, 1.6, 0.9);
     localRot.set(-0.25, 0, 0);
-    localScale.set(0.38,0.38,0.38); // smaller
+    localScale.set(0.34,0.34,0.34); // slightly smaller
   } else if (action === 'sweet') {
     // permen: start higher & further, small
     localStart.set(0.08, 1.8, 0.95);
     localRot.set(0, 0.4, 0.1);
-    localScale.set(0.28,0.28,0.28); // smaller
+    localScale.set(0.26,0.26,0.26); // smaller
   }
 
   // wrapper group to animate local transforms easily
@@ -257,8 +262,8 @@ async function runInteractorAnimation(action) {
   // animate depending on action
   let animPromise = null;
   if (action === 'brush') animPromise = animateBrush(wrapper);
-  else if (action === 'healthy') animPromise = animateCarrot(wrapper);
-  else if (action === 'sweet') animPromise = animateCandy(wrapper);
+  else if (action === 'healthy') animPromise = animateCarrotFade(wrapper); // fade version
+  else if (action === 'sweet') animPromise = animateCandyFade(wrapper);     // fade version
   else animPromise = Promise.resolve();
 
   // wait animation finish
@@ -270,19 +275,6 @@ async function runInteractorAnimation(action) {
     disposeObject(wrapper);
   } catch (e) { /* ignore */ }
 
-  // re-enable buttons only if UI not in terminal state
-  try {
-    const state = window.kariesUI && typeof window.kariesUI._getState === 'function' ? window.kariesUI._getState() : null;
-    const terminal = state && (state.cleanValue <= 0 && state.healthValue <= 0);
-    if (!terminal) {
-      window.kariesUI?.setButtonsEnabled(true);
-    } else {
-      console.log('UI is terminal — leaving buttons locked after interactor.');
-    }
-  } catch (e) {
-    try { window.kariesUI?.setButtonsEnabled(true); } catch (err) {}
-  }
-
   return;
 }
 
@@ -290,7 +282,7 @@ async function runInteractorAnimation(action) {
 function lerp(a,b,t){ return a + (b-a)*t; }
 function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
 
-// animate brush: approach -> 2 strokes -> retreat
+// animate brush: approach -> 2 strokes -> retreat (unchanged)
 function animateBrush(wrapper) {
   return new Promise((resolve) => {
     const startTime = performance.now();
@@ -338,39 +330,46 @@ function animateBrush(wrapper) {
   });
 }
 
-// animate carrot: fall from above, pop, vanish
-function animateCarrot(wrapper) {
+// animate carrot with fade-out (fall -> small bounce -> fade)
+function animateCarrotFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
     const startY = wrapper.position.y;
     const startZ = wrapper.position.z;
-    const approach = 420; // fall time
-    const pop = 180;      // pop/bounce
-    const out = 240;      // vanish
+    const fall = 420; // fall time
+    const bounce = 180;
+    const fade = 260;
+
+    // set initial material opacity to 1
+    wrapper.traverse((c) => { if (c.isMesh && c.material) c.material.opacity = 1.0; });
 
     function frame(now) {
       const elapsed = now - start;
-      if (elapsed < approach) {
-        const t = Math.min(1, elapsed / approach);
-        const tt = t * t; // ease-in for gravity feel
+      if (elapsed < fall) {
+        const t = Math.min(1, elapsed / fall);
+        const tt = t * t;
         wrapper.position.y = lerp(startY, startY - 1.05, tt);
         wrapper.position.z = lerp(startZ, startZ - 0.45, tt);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approach + pop) {
-        const t2 = (elapsed - approach) / pop;
+      if (elapsed < fall + bounce) {
+        const t2 = (elapsed - fall) / bounce;
         const pulse = Math.sin(t2 * Math.PI);
-        wrapper.scale.setScalar(lerp(0.9, 1.08, pulse));
-        wrapper.position.y = lerp(startY - 1.05, startY - 0.9, pulse * 0.6);
+        wrapper.scale.setScalar(lerp(0.9, 1.02, pulse));
+        wrapper.position.y = lerp(startY - 1.05, startY - 0.92, pulse * 0.6);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < approach + pop + out) {
-        const t3 = (elapsed - approach - pop) / out;
+      if (elapsed < fall + bounce + fade) {
+        const t3 = (elapsed - fall - bounce) / fade;
         const tt3 = easeInOutQuad(t3);
-        wrapper.scale.setScalar(lerp(1.08, 0.02, tt3));
-        wrapper.position.y = lerp(startY - 0.9, startY + 0.5, tt3);
+        // fade opacity to 0
+        wrapper.traverse((c) => {
+          if (c.isMesh && c.material) c.material.opacity = 1 - tt3;
+        });
+        // slight upward move while fading
+        wrapper.position.y = lerp(startY - 0.92, startY + 0.45, tt3);
         requestAnimationFrame(frame);
         return;
       }
@@ -380,16 +379,19 @@ function animateCarrot(wrapper) {
   });
 }
 
-// animate candy: fall from above, stick pulse, vanish
-function animateCandy(wrapper) {
+// animate candy with fade-out (fall -> sticky pulse -> fade)
+function animateCandyFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
     const startY = wrapper.position.y;
     const startZ = wrapper.position.z;
     const fall = 320;
     const stick = 260;
-    const vanish = 220;
+    const fade = 220;
     const initialScale = wrapper.scale.x;
+
+    // set initial material opacity to 1
+    wrapper.traverse((c) => { if (c.isMesh && c.material) c.material.opacity = 1.0; });
 
     function frame(now) {
       const elapsed = now - start;
@@ -403,15 +405,17 @@ function animateCandy(wrapper) {
       }
       if (elapsed < fall + stick) {
         const t2 = (elapsed - fall) / stick;
-        const pulse = 1 + 0.16 * Math.sin(t2 * Math.PI * 3);
+        const pulse = 1 + 0.14 * Math.sin(t2 * Math.PI * 3);
         wrapper.scale.setScalar(initialScale * pulse);
         requestAnimationFrame(frame);
         return;
       }
-      if (elapsed < fall + stick + vanish) {
-        const t3 = (elapsed - fall - stick) / vanish;
+      if (elapsed < fall + stick + fade) {
+        const t3 = (elapsed - fall - stick) / fade;
         const tt3 = easeInOutQuad(t3);
-        wrapper.scale.setScalar(lerp(initialScale * 1.16, 0.01, tt3));
+        wrapper.traverse((c) => {
+          if (c.isMesh && c.material) c.material.opacity = 1 - tt3;
+        });
         wrapper.position.y = lerp(startY - 1.05, startY + 0.6, tt3);
         requestAnimationFrame(frame);
         return;
@@ -422,12 +426,12 @@ function animateCandy(wrapper) {
   });
 }
 
-// ---- Animated swapModelForHealth (scale out/in) ----
-function swapModelForHealth(healthKey) {
+// ---- Swap model AFTER UI dispatches health-changed (but DO NOT scale out/in anymore) ----
+function swapModelForHealthAfterDelay(healthKey) {
   const modelFile = MODEL_MAP[healthKey];
   if (!modelFile) return;
   if (placedObject && placedObject.userData && placedObject.userData.modelFile === modelFile) return;
-  console.log('Swapping model to', modelFile);
+  console.log('Scheduling swap to', modelFile);
 
   // capture world transform
   const pos = new THREE.Vector3();
@@ -436,27 +440,12 @@ function swapModelForHealth(healthKey) {
   if (placedObject) placedObject.matrixWorld.decompose(pos, quat, scl);
   else reticle.matrix.decompose(pos, quat, scl);
 
-  const animateScale = (obj, from, to, duration=200) => {
-    return new Promise(resolve => {
-      const start = performance.now();
-      function step(now) {
-        const t = Math.min(1, (now - start) / duration);
-        const tt = t<0.5 ? 2*t*t : -1 + (4-2*t)*t; // easeInOutQuad
-        const s = from + (to - from) * tt;
-        obj.scale.setScalar(s);
-        if (t < 1) requestAnimationFrame(step);
-        else resolve();
-      }
-      requestAnimationFrame(step);
-    });
-  };
-
   const cached = modelCache[modelFile];
 
   (async () => {
+    // simple approach: replace model immediately but no fancy scale animation.
     if (placedObject) {
-      try { await animateScale(placedObject, placedObject.scale.x, 0.01, 180); } catch(e){ console.warn(e); }
-      try { scene.remove(placedObject); disposeObject(placedObject); } catch(e){/*ignore*/ }
+      try { scene.remove(placedObject); disposeObject(placedObject); } catch (e) {}
       placedObject = null;
     }
 
@@ -464,34 +453,30 @@ function swapModelForHealth(healthKey) {
       const newModel = cached.clone(true);
       newModel.position.copy(pos);
       newModel.quaternion.copy(quat);
-      newModel.scale.set(0.01,0.01,0.01);
+      newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
       newModel.userData.modelFile = modelFile;
       applyMeshMaterialTweaks(newModel);
       scene.add(newModel);
       placedObject = newModel;
-      await animateScale(placedObject, 0.01, BASE_SCALE, 200);
       console.log('Model swapped (cache) to', modelFile);
       return;
     }
 
     loader.load(modelFile,
-      async (gltf) => {
+      (gltf) => {
         const newModel = gltf.scene || gltf.scenes[0];
         if (!newModel) { console.error('GLTF has no scene:', modelFile); return; }
         newModel.position.copy(pos);
         newModel.quaternion.copy(quat);
-        newModel.scale.set(0.01,0.01,0.01);
+        newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
         newModel.userData.modelFile = modelFile;
         applyMeshMaterialTweaks(newModel);
         scene.add(newModel);
         placedObject = newModel;
-        await animateScale(placedObject, 0.01, BASE_SCALE, 200);
         console.log('Model swapped (loaded) to', modelFile);
       },
       undefined,
-      (err) => {
-        console.error('Failed to load model', modelFile, err);
-      }
+      (err) => { console.error('failed to load', modelFile, err); }
     );
   })();
 }
