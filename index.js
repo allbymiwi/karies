@@ -1,4 +1,3 @@
-// index.js (brush animation: circular orbit over tooth) - full file
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -45,10 +44,12 @@ const xrBtn = document.getElementById('xrBtn');
 // lighting global
 let spotLight = null;
 
-xrBtn.addEventListener('click', () => {
-  if (!xrSession) requestXRSession();
-  else endXRSession();
-});
+if (xrBtn) {
+  xrBtn.addEventListener('click', () => {
+    if (!xrSession) requestXRSession();
+    else endXRSession();
+  });
+}
 
 function initThree() {
   const canvas = document.getElementById('canvas');
@@ -564,7 +565,14 @@ async function requestXRSession() {
 
 async function onSessionStarted(session) {
   xrSession = session;
-  xrBtn.textContent = 'STOP AR';
+  xrBtn && (xrBtn.textContent = 'STOP AR');
+
+  // SHOW UI overlay when AR session starts
+  try {
+    const uiEl = document.getElementById('ui');
+    if (uiEl) uiEl.classList.add('active');
+  } catch(e) { /* ignore if no UI in DOM */ }
+
   try {
     await gl.makeXRCompatible();
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
@@ -581,7 +589,14 @@ async function onSessionStarted(session) {
 
 function onSessionEnded() {
   xrSession = null;
-  xrBtn.textContent = 'Enter AR';
+  xrBtn && (xrBtn.textContent = 'Enter AR');
+
+  // HIDE UI overlay when AR session ends
+  try {
+    const uiEl = document.getElementById('ui');
+    if (uiEl) uiEl.classList.remove('active');
+  } catch(e) { /* ignore */ }
+
   hitTestSourceRequested = false;
   hitTestSource = null;
   renderer.setAnimationLoop(null);
@@ -690,17 +705,3 @@ function render(time, frame) {
 
 // initialize
 initThree();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
