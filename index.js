@@ -68,6 +68,34 @@ function initThree() {
 
   window.addEventListener('resize', onWindowResize);
 
+  // Listen UI actions (dispatched by ui.js) so AR can give feedback
+  window.addEventListener('ui-action', (e) => {
+    const action = e.detail;
+    if (!placedObject) return;
+    // quick visual feedback: flash emissive color if material supports it
+    placedObject.traverse((c) => {
+      if (c.isMesh && c.material) {
+        if (!c.userData._oldEmissive) {
+          c.userData._oldEmissive = c.material.emissive ? c.material.emissive.clone() : null;
+        }
+        if (c.material.emissive) c.material.emissive.setHex(0xffe066);
+      }
+    });
+
+    // small rotation
+    if (action === 'brush') placedObject.rotation.x += 0.12;
+    if (action === 'sweet') placedObject.rotation.y += 0.18;
+    if (action === 'healthy') placedObject.rotation.z += 0.12;
+
+    setTimeout(() => {
+      placedObject.traverse((c) => {
+        if (c.isMesh && c.material && c.userData._oldEmissive) {
+          c.material.emissive.copy(c.userData._oldEmissive);
+        }
+      });
+    }, 350);
+  });
+
   console.log('index.js loaded. Ready.');
 }
 
