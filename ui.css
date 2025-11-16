@@ -9,24 +9,18 @@ body {
 /* canvas penuh */
 canvas { display:block; width:100vw; height:100vh; position: absolute; }
 
-/* UI Overlay - default hidden until AR active */
+/* UI Overlay */
 #ui {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  display: none;              /* default: HIDDEN */
+  display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
   pointer-events: none;
-}
-
-/* shown when AR active */
-#ui.active {
-  display: flex;              /* shown only when .active */
-  pointer-events: none;       /* container remains non-interactive; children control pointer-events */
 }
 
 /* STATUS BARS */
@@ -65,7 +59,6 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 @keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
 
 /* Buttons container */
-/* Buttons need pointer-events enabled so user can click them when UI is active */
 #buttons {
   width: 100%;
   max-width: 420px;
@@ -79,7 +72,6 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .action-btn {
   display:flex; flex-direction:column; align-items:center; text-align:center;
   background:none; border:none; cursor:pointer; transition: transform 0.15s ease;
-  pointer-events: auto;
 }
 .action-btn img {
   width:65px; height:65px; border-radius:50%; box-shadow:0 3px 8px rgba(0,0,0,0.25);
@@ -121,5 +113,4 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   color: #fff;
   font-weight:600;
   cursor:pointer;
-  pointer-events: auto;
 }
