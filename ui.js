@@ -1,4 +1,4 @@
-/* ui.js */
+/* ui.js (updated) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -13,10 +13,12 @@
   // initially disable action buttons until model ready
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
+      // visually and functionally enable/disable
       b.style.opacity = enabled ? '1' : '0.55';
       b.style.pointerEvents = enabled ? 'auto' : 'none';
       b.tabIndex = enabled ? 0 : -1;
-      if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
+      if (enabled) b.removeAttribute('aria-disabled');
+      else b.setAttribute('aria-disabled', 'true');
     });
   }
   setButtonsEnabled(false);
@@ -29,12 +31,14 @@
     updateBars();
   });
 
-  // action buttons: update UI and dispatch ui-action for AR to react
+  // action buttons
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
-      setAction(action); // local UI update
-      window.dispatchEvent(new CustomEvent('ui-action', { detail: action })); // notify AR
+      // UI internal logic
+      setAction(action);
+      // dispatch event so AR/index.js can respond too
+      window.dispatchEvent(new CustomEvent('ui-action', { detail: action }));
     });
   });
 
