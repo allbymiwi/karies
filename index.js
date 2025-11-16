@@ -239,12 +239,12 @@ async function runInteractorAnimation(action) {
     // wortel: start high above and a bit in front (will fall)
     localStart.set(0.0, 1.6, 0.9);
     localRot.set(-0.25, 0, -0.5);
-    localScale.set(0.34,0.34,0.34); // slightly smaller
+    localScale.set(0.40,0.40,0.40); // slightly smaller
   } else if (action === 'sweet') {
     // permen: start higher & further, small
     localStart.set(0.08, 1.8, 0.95);
     localRot.set(0, 0.4, 0.8);
-    localScale.set(0.26,0.26,0.26); // smaller
+    localScale.set(0.32,0.32,0.32); // smaller
   }
 
   // wrapper group to animate local transforms easily
@@ -690,6 +690,7 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
 
 
 
