@@ -1,4 +1,9 @@
-// index.js (full) - with interactor (tween) animations for sikatgigi, wortel, permen
+// index.js (full, updated: animated swap + interactor start tweaks)
+// Requirements:
+// - modules/three.module.js
+// - modules/GLTFLoader.js
+// - gigisehat.glb, gigiplak.glb, gigiasam.glb, gigidemineralisasi.glb, gigikaries.glb
+// - sikatgigi.glb, wortel.glb, permen.glb
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -84,6 +89,8 @@ function initThree() {
   spotLight.position.set(0.6, 1.8, 0.6);
   spotLight.target.position.set(0, 0, 0);
   spotLight.castShadow = true;
+  spotLight.shadow.mapSize.width = 1024;
+  spotLight.shadow.mapSize.height = 1024;
   scene.add(spotLight);
   scene.add(spotLight.target);
 
@@ -104,7 +111,7 @@ function initThree() {
 
   window.addEventListener('resize', onWindowResize);
 
-  // listen health-changed (swap tooth)
+  // listen for UI health updates (swap tooth)
   window.addEventListener('health-changed', (e) => {
     const health = e.detail && typeof e.detail.health === 'number' ? e.detail.health : null;
     if (health === null) return;
@@ -113,12 +120,12 @@ function initThree() {
     if (objectPlaced) swapModelForHealth(key);
   });
 
-  // reset listener
+  // listen reset event from UI
   window.addEventListener('reset', () => {
-    console.log('reset received - removing placed model');
+    console.log('Reset event received - removing placed model and resetting AR state.');
     if (placedObject) {
       scene.remove(placedObject);
-      try { disposeObject(placedObject); } catch (err) { console.warn(err); }
+      try { disposeObject(placedObject); } catch (err) { console.warn('dispose failed', err); }
       placedObject = null;
     }
     objectPlaced = false;
@@ -129,7 +136,6 @@ function initThree() {
   window.addEventListener('ui-action', (e) => {
     const action = e.detail;
     if (!action || !objectPlaced) return;
-    // spawn interactor for actions: brush (sikat), healthy (wortel), sweet (permen)
     if (action === 'brush' || action === 'healthy' || action === 'sweet') {
       runInteractorAnimation(action).catch(err => console.warn('interactor anim error', err));
     }
@@ -176,10 +182,9 @@ function preloadAllModelsAndInteractors() {
           const node = gltf.scene || gltf.scenes[0];
           if (!node) { resolve(); return; }
           applyMeshMaterialTweaks(node);
-          // store into appropriate cache
+          // store into appropriate cache (store original)
           if (Object.values(MODEL_MAP).includes(file)) modelCache[file] = node;
           if (Object.values(INTERACTORS).includes(file)) {
-            // map back to action key
             const actionKey = Object.keys(INTERACTORS).find(k => INTERACTORS[k] === file);
             if (actionKey) interactorCache[actionKey] = node;
           }
@@ -187,7 +192,7 @@ function preloadAllModelsAndInteractors() {
         },
         undefined,
         (err) => {
-          console.warn('preload failed', file, err);
+          console.warn('preload failed for', file, err);
           resolve(); // don't block
         }
       );
@@ -198,50 +203,46 @@ function preloadAllModelsAndInteractors() {
 
 // spawn interactor (clone cached glb or load fallback)
 async function runInteractorAnimation(action) {
-  // ensure cache
   const file = INTERACTORS[action];
   if (!file) return;
   // disable UI buttons while interact anim runs
   try { window.kariesUI?.setButtonsEnabled(false); } catch (e) {}
   let interactorRoot = null;
   const cached = interactorCache[action];
-  if (cached) {
-    interactorRoot = cached.clone(true);
-  } else {
+  if (cached) interactorRoot = cached.clone(true);
+  else {
     // fallback load
     const gltf = await new Promise((res, rej) => {
       loader.load(file, (g) => res(g), undefined, (err) => rej(err));
     });
     interactorRoot = gltf.scene || gltf.scenes[0];
   }
-  // parent to placedObject
+
   if (!placedObject) {
-    // safety
-    console.warn('no placedObject to attach interactor');
     try { window.kariesUI?.setButtonsEnabled(true); } catch (e) {}
     return;
   }
 
-  // set initial local transform depending on action
+  // set initial local transform depending on action (adjusted: further away & smaller)
   const localStart = new THREE.Vector3();
   const localRot = new THREE.Euler();
   const localScale = new THREE.Vector3(1,1,1);
 
   if (action === 'brush') {
-    // place to the right-front of tooth (local)
-    localStart.set(0.45, 0.05, 0.25);
-    localRot.set(-0.6, 0.6, -1.2); // roughly pointing to tooth
-    localScale.set(0.8,0.8,0.8);
+    // sikat sedikit lebih dekat and proportionate
+    localStart.set(0.42, 0.04, 0.32);
+    localRot.set(-0.6, 0.6, -1.2);
+    localScale.set(0.75,0.75,0.75);
   } else if (action === 'healthy') {
-    // carrot comes from front
-    localStart.set(0, 0.25, 0.6);
-    localRot.set(-0.2, 0, 0);
-    localScale.set(0.8,0.8,0.8);
+    // wortel: start further front and smaller
+    localStart.set(0, 0.45, 1.05);
+    localRot.set(-0.12, 0, 0);
+    localScale.set(0.45,0.45,0.45);
   } else if (action === 'sweet') {
-    // candy from above/front
-    localStart.set(0.12, 0.35, 0.45);
+    // permen: start higher & further
+    localStart.set(0.12, 0.7, 1.05);
     localRot.set(0, 0.4, 0.1);
-    localScale.set(0.6,0.6,0.6);
+    localScale.set(0.35,0.35,0.35);
   }
 
   // create wrapper group so we can animate local transforms easily
@@ -251,10 +252,8 @@ async function runInteractorAnimation(action) {
   wrapper.scale.copy(localScale);
   wrapper.userData._isInteractor = true;
 
-  // ensure cloned meshes receive shadow settings
   applyMeshMaterialTweaks(interactorRoot);
   wrapper.add(interactorRoot);
-  // attach to placedObject so wrapper local coords are relative to tooth
   placedObject.add(wrapper);
 
   // animate depending on action
@@ -283,38 +282,37 @@ async function runInteractorAnimation(action) {
 function lerp(a,b,t){ return a + (b-a)*t; }
 function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
 
-// animate brush: sequence: approach -> 2 strokes (left-right) -> retreat
+// animate brush: approach -> 2 strokes -> retreat
 function animateBrush(wrapper) {
   return new Promise((resolve) => {
-    const total = 1100; // ms
     const startTime = performance.now();
-    const initial = { x: wrapper.position.x, y: wrapper.position.y, z: wrapper.position.z, rotZ: wrapper.rotation.z };
+    const initial = {
+      x: wrapper.position.x,
+      y: wrapper.position.y,
+      z: wrapper.position.z,
+      rotZ: wrapper.rotation.z
+    };
     const approachDur = 120;
-    const strokeDur = 370; // two strokes ~ 2*strokeDur/2
+    const strokeDur = 370;
     const retreatDur = 120;
 
     function frame(now){
       const elapsed = now - startTime;
       if (elapsed < approachDur) {
-        // approach: move slightly closer
         const t = easeInOutQuad(elapsed / approachDur);
         wrapper.position.z = lerp(initial.z, initial.z - 0.12, t);
         requestAnimationFrame(frame);
         return;
       }
-      const mid = approachDur;
       if (elapsed < approachDur + strokeDur) {
-        // stroke phase 1 (right->left)
-        const t = (elapsed - mid) / strokeDur;
+        const t = (elapsed - approachDur) / strokeDur;
         const tt = easeInOutQuad(t);
-        // rotate/translate for stroke effect
-        wrapper.rotation.z = lerp(initial.rotZ, initial.rotZ + 0.45, Math.sin(tt * Math.PI));
+        wrapper.rotation.z = initial.rotZ + 0.45 * Math.sin(tt * Math.PI);
         wrapper.position.x = lerp(initial.x, initial.x - 0.18, tt);
         requestAnimationFrame(frame);
         return;
       }
       if (elapsed < approachDur + 2*strokeDur) {
-        // stroke phase 2 (left->right)
         const t2 = (elapsed - (approachDur + strokeDur)) / strokeDur;
         const tt2 = easeInOutQuad(t2);
         wrapper.rotation.z = lerp(initial.rotZ + 0.45, initial.rotZ - 0.25, Math.sin(tt2 * Math.PI));
@@ -323,7 +321,6 @@ function animateBrush(wrapper) {
         return;
       }
       if (elapsed < approachDur + 2*strokeDur + retreatDur) {
-        // retreat
         const t3 = (elapsed - (approachDur + 2*strokeDur)) / retreatDur;
         const tt3 = easeInOutQuad(t3);
         wrapper.position.z = lerp(initial.z - 0.12, initial.z, tt3);
@@ -332,20 +329,19 @@ function animateBrush(wrapper) {
         requestAnimationFrame(frame);
         return;
       }
-      // done
       resolve();
     }
     requestAnimationFrame(frame);
   });
 }
 
-// animate carrot: move in from front, "bite" (push), pop out
+// animate carrot (wortel): start further out, move in, bite, retreat
 function animateCarrot(wrapper) {
   return new Promise((resolve) => {
-    const total = 700;
     const startTime = performance.now();
-    const initial = { z: wrapper.position.z, y: wrapper.position.y };
-    const approach = 300;
+    const initialZ = wrapper.position.z;
+    const initialY = wrapper.position.y;
+    const approach = 420; // longer because start further
     const bite = 180;
     const out = 220;
 
@@ -353,25 +349,25 @@ function animateCarrot(wrapper) {
       const elapsed = now - startTime;
       if (elapsed < approach) {
         const t = easeInOutQuad(elapsed / approach);
-        wrapper.position.z = lerp(initial.z, initial.z - 0.45, t);
-        wrapper.position.y = lerp(initial.y, initial.y - 0.06, t);
+        wrapper.position.z = lerp(initialZ, initialZ - 0.65, t);
+        wrapper.position.y = lerp(initialY, initialY - 0.06, t);
         requestAnimationFrame(frame);
         return;
       }
       if (elapsed < approach + bite) {
         const t2 = (elapsed - approach) / bite;
-        const tt = Math.sin(t2 * Math.PI); // small pop
-        wrapper.position.y = lerp(initial.y - 0.06, initial.y - 0.02, tt);
-        wrapper.scale.setScalar(lerp(0.95, 1.02, tt));
+        const tt = Math.sin(t2 * Math.PI);
+        wrapper.position.y = lerp(initialY - 0.06, initialY - 0.02, tt);
+        wrapper.scale.setScalar(lerp(0.9, 1.06, tt));
         requestAnimationFrame(frame);
         return;
       }
       if (elapsed < approach + bite + out) {
         const t3 = (elapsed - approach - bite) / out;
         const tt3 = easeInOutQuad(t3);
-        wrapper.position.z = lerp(initial.z - 0.45, initial.z + 0.25, tt3);
-        wrapper.position.y = lerp(initial.y - 0.02, initial.y + 0.18, tt3);
-        wrapper.scale.setScalar(lerp(1.02, 0.85, tt3));
+        wrapper.position.z = lerp(initialZ - 0.65, initialZ + 0.35, tt3);
+        wrapper.position.y = lerp(initialY - 0.02, initialY + 0.18, tt3);
+        wrapper.scale.setScalar(lerp(1.06, 0.72, tt3));
         requestAnimationFrame(frame);
         return;
       }
@@ -381,37 +377,38 @@ function animateCarrot(wrapper) {
   });
 }
 
-// animate candy: float in, stick briefly (scale pulse), then disappear
+// animate candy (permen): float in, stick pulse, disappear
 function animateCandy(wrapper) {
   return new Promise((resolve) => {
     const startTime = performance.now();
-    const approach = 300;
-    const stick = 220;
-    const disappear = 240;
-    const initial = { y: wrapper.position.y, z: wrapper.position.z, s: wrapper.scale.x };
+    const initialY = wrapper.position.y;
+    const initialZ = wrapper.position.z;
+    const initialS = wrapper.scale.x;
+    const approach = 360;
+    const stick = 260;
+    const disappear = 260;
 
     function frame(now) {
       const elapsed = now - startTime;
       if (elapsed < approach) {
         const t = easeInOutQuad(elapsed / approach);
-        wrapper.position.z = lerp(initial.z, initial.z - 0.35, t);
-        wrapper.position.y = lerp(initial.y, initial.y - 0.06, t);
+        wrapper.position.z = lerp(initialZ, initialZ - 0.55, t);
+        wrapper.position.y = lerp(initialY, initialY - 0.06, t);
         requestAnimationFrame(frame);
         return;
       }
       if (elapsed < approach + stick) {
         const t2 = (elapsed - approach) / stick;
-        // little pulse
         const pulse = 1 + 0.12 * Math.sin(t2 * Math.PI * 3);
-        wrapper.scale.setScalar(initial.s * pulse);
+        wrapper.scale.setScalar(initialS * pulse);
         requestAnimationFrame(frame);
         return;
       }
       if (elapsed < approach + stick + disappear) {
         const t3 = (elapsed - approach - stick) / disappear;
         const tt3 = easeInOutQuad(t3);
-        wrapper.scale.setScalar(lerp(initial.s * 1.12, 0.01, tt3));
-        wrapper.position.y = lerp(initial.y - 0.06, initial.y + 0.12, tt3);
+        wrapper.scale.setScalar(lerp(initialS * 1.12, 0.01, tt3));
+        wrapper.position.y = lerp(initialY - 0.06, initialY + 0.18, tt3);
         requestAnimationFrame(frame);
         return;
       }
@@ -421,57 +418,78 @@ function animateCandy(wrapper) {
   });
 }
 
-// swap tooth models (uses cache if available)
+// ---- Animated swapModelForHealth (scale out/in) ----
 function swapModelForHealth(healthKey) {
   const modelFile = MODEL_MAP[healthKey];
   if (!modelFile) return;
   if (placedObject && placedObject.userData && placedObject.userData.modelFile === modelFile) return;
   console.log('Swapping model to', modelFile);
 
+  // capture world transform
   const pos = new THREE.Vector3();
   const quat = new THREE.Quaternion();
   const scl = new THREE.Vector3();
   if (placedObject) placedObject.matrixWorld.decompose(pos, quat, scl);
   else reticle.matrix.decompose(pos, quat, scl);
 
-  const cached = modelCache[modelFile];
-  if (cached) {
-    if (placedObject) {
-      scene.remove(placedObject);
-      disposeObject(placedObject);
-      placedObject = null;
-    }
-    const newModel = cached.clone(true);
-    newModel.position.copy(pos);
-    newModel.quaternion.copy(quat);
-    newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
-    newModel.userData.modelFile = modelFile;
-    applyMeshMaterialTweaks(newModel);
-    scene.add(newModel);
-    placedObject = newModel;
-    console.log('Model swapped (cache) to', modelFile);
-    return;
-  }
+  const animateScale = (obj, from, to, duration=200) => {
+    return new Promise(resolve => {
+      const start = performance.now();
+      function step(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const tt = t<0.5 ? 2*t*t : -1 + (4-2*t)*t; // easeInOutQuad
+        const s = from + (to - from) * tt;
+        obj.scale.setScalar(s);
+        if (t < 1) requestAnimationFrame(step);
+        else resolve();
+      }
+      requestAnimationFrame(step);
+    });
+  };
 
-  loader.load(modelFile, (gltf) => {
-    const newModel = gltf.scene || gltf.scenes[0];
-    if (!newModel) { console.error('no scene in gltf', modelFile); return; }
+  const cached = modelCache[modelFile];
+
+  (async () => {
     if (placedObject) {
-      scene.remove(placedObject);
-      disposeObject(placedObject);
+      try { await animateScale(placedObject, placedObject.scale.x, 0.01, 180); } catch(e){ console.warn(e); }
+      try { scene.remove(placedObject); disposeObject(placedObject); } catch(e){/*ignore*/ }
       placedObject = null;
     }
-    newModel.position.copy(pos);
-    newModel.quaternion.copy(quat);
-    newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
-    newModel.userData.modelFile = modelFile;
-    applyMeshMaterialTweaks(newModel);
-    scene.add(newModel);
-    placedObject = newModel;
-    console.log('Model swapped (loaded) to', modelFile);
-  }, undefined, (err) => {
-    console.error('failed to load', modelFile, err);
-  });
+
+    if (cached) {
+      const newModel = cached.clone(true);
+      newModel.position.copy(pos);
+      newModel.quaternion.copy(quat);
+      newModel.scale.set(0.01,0.01,0.01);
+      newModel.userData.modelFile = modelFile;
+      applyMeshMaterialTweaks(newModel);
+      scene.add(newModel);
+      placedObject = newModel;
+      await animateScale(placedObject, 0.01, BASE_SCALE, 200);
+      console.log('Model swapped (cache) to', modelFile);
+      return;
+    }
+
+    loader.load(modelFile,
+      async (gltf) => {
+        const newModel = gltf.scene || gltf.scenes[0];
+        if (!newModel) { console.error('GLTF has no scene:', modelFile); return; }
+        newModel.position.copy(pos);
+        newModel.quaternion.copy(quat);
+        newModel.scale.set(0.01,0.01,0.01);
+        newModel.userData.modelFile = modelFile;
+        applyMeshMaterialTweaks(newModel);
+        scene.add(newModel);
+        placedObject = newModel;
+        await animateScale(placedObject, 0.01, BASE_SCALE, 200);
+        console.log('Model swapped (loaded) to', modelFile);
+      },
+      undefined,
+      (err) => {
+        console.error('Failed to load model', modelFile, err);
+      }
+    );
+  })();
 }
 
 function disposeObject(obj) {
