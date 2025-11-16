@@ -233,3 +233,4 @@ createButtons(); // already called earlier but safe to call
 // Note: we don't start animation loop here. It starts when XR session begins.
 
 console.log('Script loaded. Pastikan gigisehat.glb ada di folder yang sama dan buka lewat localhost/https.');
+
