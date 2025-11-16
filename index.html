@@ -1,30 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demo 7 - WebXR</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AR - Gigisehat</title>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden; 
+    body { margin:0; overflow:hidden; font-family:system-ui,Segoe UI,Roboto; }
+    header { position: absolute; top: 8px; left: 8px; z-index: 10; }
+    button.xr-btn {
+      position: absolute; top: 10px; left: 10px; z-index: 20; padding:8px 12px;
+      background: #111; color:#fff; border-radius:6px; border: none;
     }
-    canvas {
-        
-        display: block;
-        width: 100vw;
-        height: 100vh;
-        position : absolute;
+    button.reset-btn {
+      position: absolute; top: 10px; left: 100px; z-index: 20; padding:8px 12px;
+      background: #fff; color:#111; border-radius:6px; border: 1px solid #ccc;
     }
+    canvas { display:block; width:100vw; height:100vh; position: absolute; }
   </style>
 </head>
 <body>
-    
-    <header>
-        <h1>Immersive AR with Three.js</h1>
-    </header>
-    <canvas id="canvas"></canvas>
-    <script type="module" src="index.js"></script>
+  <header><h3 style="margin:0;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">AR - Gigisehat</h3></header>
 
+  <!-- Buttons dibuat/di-manage juga dari JS -->
+  <canvas id="canvas"></canvas>
+  <script type="module" src="index.js"></script>
 </body>
 </html>
