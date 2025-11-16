@@ -3,7 +3,7 @@
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
   const healthFill = document.getElementById('healthFill');
-  const buttons = document.querySelectorAll('.action-btn');
+  const buttons = Array.from(document.querySelectorAll('.action-btn'));
 
   let toothReady = false;
   let cleanValue = 100;
@@ -11,33 +11,35 @@
   let sweetCount = 0;
 
   // initially disable action buttons until model ready
-  buttons.forEach(b => { b.style.opacity = 0.6; b.style.pointerEvents = 'none'; });
+  function setButtonsEnabled(enabled) {
+    buttons.forEach(b => {
+      b.style.opacity = enabled ? '1' : '0.55';
+      b.style.pointerEvents = enabled ? 'auto' : 'none';
+      b.tabIndex = enabled ? 0 : -1;
+      if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
+    });
+  }
+  setButtonsEnabled(false);
 
   // Listen for model placed event (dispatched by index.js)
   window.addEventListener('model-placed', (ev) => {
     toothReady = true;
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
-    buttons.forEach(b => { b.style.opacity = 1; b.style.pointerEvents = 'auto'; });
+    setButtonsEnabled(true);
     updateBars();
   });
 
-  // XR may be started before model loaded — keep checking if placed
-  document.getElementById('xrBtn').addEventListener('click', () => {
-    // info change handled by index.js for session status if needed
-    setTimeout(() => {
-      // no-op here, just placeholder if you want to set info
-    }, 200);
-  });
-
-  // action buttons
+  // action buttons: update UI and dispatch ui-action for AR to react
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
-      setAction(action);
+      setAction(action); // local UI update
+      window.dispatchEvent(new CustomEvent('ui-action', { detail: action })); // notify AR
     });
   });
 
   function fadeInfo(text) {
+    if (!info) return;
     info.style.opacity = 0;
     setTimeout(() => {
       info.textContent = text;
@@ -46,8 +48,8 @@
   }
 
   function updateBars() {
-    cleanFill.style.width = Math.max(0, Math.min(100, cleanValue)) + "%";
-    healthFill.style.width = Math.max(0, Math.min(100, healthValue)) + "%";
+    if (cleanFill) cleanFill.style.width = Math.max(0, Math.min(100, cleanValue)) + "%";
+    if (healthFill) healthFill.style.width = Math.max(0, Math.min(100, healthValue)) + "%";
   }
 
   function setAction(action) {
@@ -70,10 +72,10 @@
         if (sweetCount >= 2) {
           sweetCount = 0;
           healthValue -= 25;
-          document.querySelector('.health .bar-inner').classList.add('damage');
+          document.querySelector('.health .bar-inner')?.classList.add('damage');
           fadeInfo("⚠️ Terlalu sering makan manis! Kesehatan menurun!");
           setTimeout(() => {
-            document.querySelector('.health .bar-inner').classList.remove('damage');
+            document.querySelector('.health .bar-inner')?.classList.remove('damage');
           }, 500);
         } else {
           fadeInfo("🍭 Gula menempel! Kebersihan menurun sedikit...");
@@ -95,5 +97,5 @@
   }
 
   // Expose for debugging if needed
-  window.kariesUI = { setAction, updateBars, fadeInfo };
+  window.kariesUI = { setAction, updateBars, fadeInfo, setButtonsEnabled };
 })();
