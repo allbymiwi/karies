@@ -127,7 +127,7 @@ function onSelect() {
       model.position.copy(_pos);
       model.quaternion.copy(_quat);
 
-      const BASE_SCALE = 0.1; // ubah kalau perlu
+      const BASE_SCALE = 0.3; // ubah kalau perlu
       model.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
 
       scene.add(model);
@@ -179,4 +179,5 @@ function render(time, frame) {
 
 // init
 initThree();
+
 
