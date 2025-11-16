@@ -1,12 +1,16 @@
-// index.js (full)
-// Pastikan: modules/three.module.js dan modules/GLTFLoader.js ada di folder modules/
-// dan gigisehat.glb ada di folder yang sama dengan index.html/index.js
-
+// index.js (updated) - swap model file when health changes
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
-const MODEL_PATH = './gigisehat.glb'; // ubah jika GLB di folder lain
-const BASE_SCALE = 0.25; // ubah ini untuk menyesuaikan ukuran model di AR (0.01 .. 1.0)
+const MODEL_PATH = './gigisehat.glb'; // default healthy model used for initial placement
+const MODEL_MAP = {
+  100: 'gigisehat.glb',
+  75:  'gigiplak.glb',
+  50:  'gigiasam.glb',
+  25:  'gigidemineralisasi.glb',
+  0:   'gigikaries.glb'
+};
+const BASE_SCALE = 0.25; // ubah sesuai kebutuhan
 
 let renderer, scene, camera, gl;
 let controller, reticle;
@@ -17,8 +21,8 @@ let hitTestSourceRequested = false;
 
 let objectPlaced = false;
 let placedObject = null;
+let currentHealthModelKey = 100;
 
-// temp vars
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
@@ -46,7 +50,7 @@ function initThree() {
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
   scene = new THREE.Scene();
 
-  // Reticle (ring)
+  // Reticle
   reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.15, 0.20, 32).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 })
@@ -55,11 +59,9 @@ function initThree() {
   reticle.visible = false;
   scene.add(reticle);
 
-  // Light
   const hemi = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
   scene.add(hemi);
 
-  // Controller (select)
   controller = renderer.xr.getController(0);
   controller.addEventListener('select', onSelect);
   scene.add(controller);
@@ -68,7 +70,90 @@ function initThree() {
 
   window.addEventListener('resize', onWindowResize);
 
+  // listen health changes from UI to swap model
+  window.addEventListener('health-changed', (e) => {
+    const health = e.detail && typeof e.detail.health === 'number' ? e.detail.health : null;
+    if (health === null) return;
+    const key = clampHealthKey(health);
+    currentHealthModelKey = key;
+    if (objectPlaced) swapModelForHealth(key);
+  });
+
   console.log('index.js loaded. Ready.');
+}
+
+function clampHealthKey(health) {
+  if (health >= 100) return 100;
+  if (health >= 75) return 75;
+  if (health >= 50) return 50;
+  if (health >= 25) return 25;
+  return 0;
+}
+
+function swapModelForHealth(healthKey) {
+  const modelFile = MODEL_MAP[healthKey];
+  if (!modelFile) return;
+  // already showing same model?
+  if (placedObject && placedObject.userData && placedObject.userData.modelFile === modelFile) return;
+
+  console.log('Swapping model to', modelFile);
+
+  // capture current world transform to reapply
+  const pos = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  const scl = new THREE.Vector3();
+  if (placedObject) {
+    placedObject.matrixWorld.decompose(pos, quat, scl);
+  } else {
+    reticle.matrix.decompose(pos, quat, scl);
+  }
+
+  // load new glb
+  loader.load(modelFile,
+    (gltf) => {
+      const newModel = gltf.scene || gltf.scenes[0];
+      if (!newModel) {
+        console.error('GLTF has no scene:', modelFile);
+        return;
+      }
+
+      // remove old
+      if (placedObject) {
+        scene.remove(placedObject);
+        disposeObject(placedObject);
+        placedObject = null;
+      }
+
+      // set transform & scale
+      newModel.position.copy(pos);
+      newModel.quaternion.copy(quat);
+      newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
+      newModel.userData.modelFile = modelFile;
+
+      scene.add(newModel);
+      placedObject = newModel;
+
+      console.log('Model swapped to', modelFile);
+    },
+    undefined,
+    (err) => {
+      console.error('Failed to load model', modelFile, err);
+    }
+  );
+}
+
+function disposeObject(obj) {
+  obj.traverse((c) => {
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) {
+      if (Array.isArray(c.material)) {
+        c.material.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+      } else {
+        if (c.material.map) c.material.map.dispose();
+        c.material.dispose();
+      }
+    }
+  });
 }
 
 function onWindowResize() {
@@ -104,13 +189,11 @@ async function onSessionStarted(session) {
     renderer.xr.setReferenceSpaceType('local');
     renderer.xr.setSession(session);
 
-    // reset hit-test flags
     hitTestSourceRequested = false;
     hitTestSource = null;
 
     session.addEventListener('end', onSessionEnded);
 
-    // start render loop
     renderer.setAnimationLoop(render);
   } catch (e) {
     console.error('Failed to start session render state:', e);
@@ -132,17 +215,15 @@ function endXRSession() {
 }
 
 function onSelect() {
-  // Only place once, and only if reticle visible
   if (!reticle.visible || objectPlaced) {
     console.log('select ignored: reticle.visible=', reticle.visible, ' objectPlaced=', objectPlaced);
     return;
   }
 
-  // decompose reticle matrix to position/quaternion/scale
+  // initial place uses healthy model
   reticle.matrix.decompose(_pos, _quat, _scale);
 
-  // load model and place
-  loader.load(MODEL_PATH,
+  loader.load(MODEL_MAP[100],
     (gltf) => {
       const model = gltf.scene || gltf.scenes[0];
       if (!model) {
@@ -150,29 +231,25 @@ function onSelect() {
         return;
       }
 
-      // apply transform from reticle
       model.position.copy(_pos);
       model.quaternion.copy(_quat);
       model.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
+      model.userData.modelFile = MODEL_MAP[100];
 
       scene.add(model);
       placedObject = model;
       objectPlaced = true;
-
-      // hide reticle after placement
       reticle.visible = false;
 
-      // dispatch global event so UI knows model is ready
+      // notify UI that model placed
       window.dispatchEvent(new CustomEvent('model-placed', { detail: model }));
 
-      console.log('Model placed and model-placed event dispatched.');
+      console.log('Initial model placed:', MODEL_MAP[100]);
     },
-    (xhr) => {
-      // optional progress logging
-    },
+    undefined,
     (err) => {
-      console.error('Error loading model:', err);
-      alert('Gagal memuat model. Cek console untuk detail.');
+      console.error('Error loading initial model:', err);
+      alert('Gagal memuat model awal. Cek console.');
     }
   );
 }
