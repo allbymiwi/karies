@@ -1,4 +1,4 @@
-/* ui.js - fix: deterministic sweet logic (every 2 presses -> health -25) */
+/* ui.js - clean UI wiring (extra buttons visible only in AR) - FIXED sweet logic */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -16,8 +16,8 @@
   let healthValue = 100;
 
   // counters for repeated actions
-  // sweetPressCount: 0..8 (one increment per sweet press)
-  let sweetPressCount = 0;
+  // toothStage: 0..8 (counts sweet presses / stages)
+  let toothStage = 0;
   let healthyCount = 0;
 
   // initially action buttons disabled until model placed
@@ -111,16 +111,16 @@
     updateBars();
     window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue, clean: cleanValue } }));
 
-    // check terminal condition: only show generic terminal message if NOT final sweet message
+    // check terminal condition
     if (cleanValue <= 0 && healthValue <= 0) {
       setButtonsEnabled(false);
-      if (sweetPressCount >= 8) {
-        // final sweet-stage message already shown in performActionEffect; keep it visible
+      // If terminal came from sweet final stage, keep that message visible (do not override).
+      if (typeof toothStage === 'number' && toothStage >= 8) {
+        // leave final sweet-stage message as-is
       } else {
         fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
       }
-      // emit terminal reached for other systems
-      window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_and_clean_zero' } }));
+      // keep Enter AR handled by xr-ended when session ends
     } else {
       setButtonsEnabled(true);
     }
@@ -160,18 +160,6 @@
     updateBars();
   });
 
-  // ---------- SWEET STAGE MESSAGES (1..8) ----------
-  const SWEET_MESSAGES = {
-    1: "🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!",
-    2: "🍬 Plak Gigi (Tetap Diingatkan) — Plaknya makin banyak nih… ayo jangan sering makan permen!",
-    3: "🍬 Peringatan Asam Laktat — Plak berubah jadi asam yang bisa merusak gigi, hati-hati ya!",
-    4: "🍬 Asam Laktat (Tetap Diingatkan) — Asamnya makin kuat… gigi bisa mulai rusak kalau terus begini!",
-    5: "🍬 Peringatan Demineralisasi Email — Lapisan luar gigi mulai melemah, jangan tambah permennya ya!",
-    6: "🍬 Demineralisasi Email (Tetap Diingatkan) — Email gigi makin rapuh… yuk hentikan sebelum bolong!",
-    7: "🍬 Peringatan Karies Gigi — Gigi mulai bolong kecil! Ini sudah berbahaya, kurangi manisnya!",
-    8: "⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!"
-  };
-
   // apply the "game logic" to UI values AFTER animations finish (called by interactor-finished)
   function performActionEffect(action) {
     switch(action) {
@@ -179,39 +167,78 @@
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
         // brushing clears accumulated sweet presses (plak dihapus)
-        sweetPressCount = 0;
+        toothStage = 0;
         healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
 
       case 'sweet':
-        // guard: if already at final stage, ignore further sweet inputs
-        if (sweetPressCount >= 8) {
-          fadeInfo(SWEET_MESSAGES[8]);
+        // setiap tekan mengurangi kebersihan sedikit
+        // guard: if already at final stage, show final message and ignore further sweet presses
+        if (toothStage >= 8) {
+          fadeInfo("⚠️ Giginya sudah bolong besar dan nggak bisa diselamatkan... Harus mulai ulang ya!");
           return;
         }
 
-        // increment press count (1..8) and reduce cleanliness each press by 12.5
-        sweetPressCount++;
+        // reduce cleanliness per press
         cleanValue = clamp100(cleanValue - 12.5);
 
-        // if we've reached an even press (2,4,6,8) -> reduce health by 25
-        if (sweetPressCount % 2 === 0) {
-          // reduce health by 25 (4 lives total)
+        // increment toothStage (1..8)
+        toothStage = (typeof toothStage === 'number') ? Math.min(8, toothStage + 1) : 1;
+
+        // every 2 presses reduce health by 25 (i.e., when toothStage is even: 2,4,6,8)
+        if (toothStage % 2 === 0) {
           healthValue = clamp100(healthValue - 25);
         }
 
-        // show the corresponding stage message (keeps final stage visible)
-        const msg = SWEET_MESSAGES[sweetPressCount] || "🍭 Gula menempel — kebersihan turun.";
-        fadeInfo(msg);
-
-        // if final stage reached, enforce terminal state: set both bars to 0 and disable actions
-        if (sweetPressCount >= 8) {
-          cleanValue = 0;
-          healthValue = 0;
-          setButtonsEnabled(false);
-          // dispatch terminal-reached so index.js & other systems can react
-          window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'karies_parah_stage8' } }));
+        // tampilkan pesan sesuai tahap (urutan yang kamu minta)
+        switch (toothStage) {
+          case 1:
+            fadeInfo("🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!");
+            cleanValue = 87.5;
+            healthValue = 100;
+            break;
+          case 2:
+            fadeInfo("🍬 Plak Gigi (Tetap Diingatkan) — Plaknya makin banyak nih… ayo jangan sering makan permen!");
+            cleanValue = 75;
+            healthValue = 75;
+            break;
+          case 3:
+            fadeInfo("🍬 Peringatan Asam Laktat — Plak berubah jadi asam yang bisa merusak gigi, hati-hati ya!");
+            cleanValue = 62.5;
+            healthValue = 75;
+            break;
+          case 4:
+            fadeInfo("🍬 Asam Laktat (Tetap Diingatkan) — Asamnya makin kuat… gigi bisa mulai rusak kalau terus begini!");
+            cleanValue = 50;
+            healthValue = 50;
+            break;
+          case 5:
+            fadeInfo("🍬 Peringatan Demineralisasi Email — Lapisan luar gigi mulai melemah, jangan tambah permennya ya!");
+            cleanValue = 37.5;
+            healthValue = 50;
+            break;
+          case 6:
+            fadeInfo("🍬 Demineralisasi Email (Tetap Diingatkan) — Email gigi makin rapuh… yuk hentikan sebelum bolong!");
+            break;
+            cleanValue = 25;
+            healthValue = 25;
+          case 7:
+            fadeInfo("🍬 Peringatan Karies Gigi — Gigi mulai bolong kecil! Ini sudah berbahaya, kurangi manisnya!");
+            break;
+            cleanValue = 12.5;
+            healthValue = 25;
+          case 8:
+            // final stage: keep this message visible and enforce terminal
+            fadeInfo("⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!");
+            cleanValue = 0;
+            healthValue = 0;
+            setButtonsEnabled(false);
+            // dispatch terminal-reached so index.js & other listeners can react
+            window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'karies_parah_stage8' } }));
+            break;
+          default:
+            fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
 
@@ -226,7 +253,6 @@
           fadeInfo("🥗 Makanan sehat menambah kebersihan sedikit.");
         }
         break;
-
       default:
         console.warn('Unknown action', action);
     }
@@ -236,7 +262,7 @@
   function resetUIState() {
     cleanValue = 100;
     healthValue = 100;
-    sweetPressCount = 0;
+    toothStage = 0;
     healthyCount = 0;
     toothReady = false;
     setButtonsEnabled(false);
@@ -249,7 +275,7 @@
     setButtonsEnabled,
     updateBars,
     fadeInfo,
-    _getState: () => ({ cleanValue, healthValue, sweetPressCount, healthyCount })
+    _getState: () => ({ cleanValue, healthValue, toothStage, healthyCount })
   };
 
   // initial UI
