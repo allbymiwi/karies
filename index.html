@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cariofriends - AR</title>
+  <title>kARies - AR Edukasi Gigi</title>
   <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-  
   <!-- XR Button -->
   <button id="xrBtn" class="xr-btn">Enter AR</button>
 
@@ -20,16 +19,16 @@
       <div class="status-bar clean">
         <img src="icons/water.png" class="status-icon" alt="Kebersihan">
         <span class="status-label">Kebersihan</span>
-        <div class="bar-fill"><div id="cleanFill" class="bar-inner"></div></div>
+        <div class="bar-fill"><div id="cleanFill" class="bar-inner" style="width:100%"></div></div>
       </div>
 
       <div class="status-bar health">
         <img src="icons/heart.png" class="status-icon" alt="Kesehatan">
         <span class="status-label">Kesehatan</span>
-        <div class="bar-fill"><div id="healthFill" class="bar-inner"></div></div>
+        <div class="bar-fill"><div id="healthFill" class="bar-inner" style="width:100%"></div></div>
       </div>
     </div>
-    
+
     <div id="infoText">Arahkan kamera ke lantai dan tekan Enter AR</div>
 
     <div id="buttons">
@@ -48,9 +47,15 @@
         <span>Makanan Manis</span>
       </button>
     </div>
+
+    <!-- Extra buttons (Reset + Exit) shown only when AR active -->
+    <div id="extraButtons" aria-hidden="true">
+      <button id="resetBtn">Reset</button>
+      <button id="exitBtn">Exit AR</button>
+    </div>
   </div>
 
-  <!-- UI logic must load BEFORE AR logic so listeners are ready -->
+  <!-- UI logic first -->
   <script src="./ui.js"></script>
 
   <!-- AR logic (module) -->
