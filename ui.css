@@ -135,20 +135,8 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   gap: 20px;
   justify-content: center;
   margin-bottom: 40px;
-  pointer-events: none; /* default disabled until AR */
-  z-index: 45;
-
-  /* hidden by default */
-  opacity: 0;
-  transform: translateY(8px) scale(0.995);
-  transition: opacity 220ms ease, transform 220ms ease;
-}
-
-/* visible when AR started */
-#extraButtons.visible {
-  opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  z-index: 45;
 }
 
 .extra-btn {

@@ -45,6 +45,25 @@ const xrBtn = document.getElementById('xrBtn');
 // lighting global
 let spotLight = null;
 
+// ------------------- NEW: health stage messages helper -------------------
+function getHealthStateMessage(healthKey) {
+  switch (healthKey) {
+    case 100:
+      return "😁 Gigi sangat sehat — terawat dengan baik!";
+    case 75:
+      return "🙂 Ada sedikit plak — perawatan ringan disarankan.";
+    case 50:
+      return "😬 Plak terlihat jelas — mulai perawatan rutin.";
+    case 25:
+      return "⚠️ Gigi terdemineralisasi — rawat lebih intensif.";
+    case 0:
+      return "🚨 Karies parah — segera konsultasi profesional!";
+    default:
+      return "Status gigi berubah.";
+  }
+}
+// -------------------------------------------------------------------------
+
 xrBtn.addEventListener('click', () => {
   if (!xrSession) requestXRSession();
   else endXRSession();
@@ -525,7 +544,19 @@ function animateCandyFade(wrapper) {
 function swapModelForHealthAfterDelay(healthKey) {
   const modelFile = MODEL_MAP[healthKey];
   if (!modelFile) return;
-  if (placedObject && placedObject.userData && placedObject.userData.modelFile === modelFile) return;
+
+  // If same model already in scene, still inform UI (refresh message)
+  if (placedObject && placedObject.userData && placedObject.userData.modelFile === modelFile) {
+    try {
+      const msgSame = getHealthStateMessage(healthKey);
+      if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
+        window.kariesUI.fadeInfo(msgSame);
+      } else {
+        window.dispatchEvent(new CustomEvent('health-stage-info', { detail: { msg: msgSame, key: healthKey } }));
+      }
+    } catch (e) { /* ignore */ }
+    return;
+  }
 
   const pos = new THREE.Vector3();
   const quat = new THREE.Quaternion();
@@ -541,6 +572,9 @@ function swapModelForHealthAfterDelay(healthKey) {
       placedObject = null;
     }
 
+    // message for this health stage
+    const stateMsg = getHealthStateMessage(healthKey);
+
     if (cachedEntry) {
       const newModel = cloneSceneWithClips(cachedEntry);
       newModel.position.copy(pos);
@@ -550,6 +584,16 @@ function swapModelForHealthAfterDelay(healthKey) {
       applyMeshMaterialTweaks(newModel);
       scene.add(newModel);
       placedObject = newModel;
+
+      // inform UI about new health stage
+      try {
+        if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
+          window.kariesUI.fadeInfo(stateMsg);
+        } else {
+          window.dispatchEvent(new CustomEvent('health-stage-info', { detail: { msg: stateMsg, key: healthKey } }));
+        }
+      } catch (e) { /* ignore */ }
+
       return;
     }
 
@@ -564,6 +608,15 @@ function swapModelForHealthAfterDelay(healthKey) {
         applyMeshMaterialTweaks(newModel);
         scene.add(newModel);
         placedObject = newModel;
+
+        // inform UI about new health stage
+        try {
+          if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
+            window.kariesUI.fadeInfo(stateMsg);
+          } else {
+            window.dispatchEvent(new CustomEvent('health-stage-info', { detail: { msg: stateMsg, key: healthKey } }));
+          }
+        } catch (e) { /* ignore */ }
       },
       undefined,
       (err) => { console.error('failed to load', modelFile, err); }
@@ -677,6 +730,7 @@ function onSelect() {
     objectPlaced = true;
     reticle.visible = false;
     window.dispatchEvent(new CustomEvent('model-placed', { detail: newModel }));
+
     return;
   }
 
