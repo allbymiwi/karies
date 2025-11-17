@@ -154,33 +154,49 @@
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
+        // brushing restores both (and resets counters)
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
         sweetCount = 0; healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
+
       case 'sweet':
-        cleanValue = clamp100(cleanValue - 12.5);
+        // increment counter first, apply health penalty first if it's the triggering hit,
+        // then always reduce cleanliness a bit.
         sweetCount++;
         if (sweetCount >= 2) {
           sweetCount = 0;
+          // health penalty applied first (as requested)
           healthValue = clamp100(healthValue - 25);
+          // then decrease cleanliness (still happens)
+          cleanValue = clamp100(cleanValue - 12.5);
           fadeInfo("🍭 Terlalu sering makan manis — kesehatan turun 25%!");
         } else {
+          // first sweet: only small cleanliness drop
+          cleanValue = clamp100(cleanValue - 12.5);
           fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
+
       case 'healthy':
-        cleanValue = clamp100(cleanValue + 12.5);
+        // similar logic to 'sweet' but positive: count towards health gain,
+        // apply health gain first when threshold reached, then apply cleanliness change.
         healthyCount++;
         if (healthyCount >= 2) {
           healthyCount = 0;
+          // health boost applied first
           healthValue = clamp100(healthValue + 25);
+          // small cleanliness increase still applied
+          cleanValue = clamp100(cleanValue + 12.5);
           fadeInfo("🥦 Makanan sehat membantu — kesehatan naik 25%!");
         } else {
+          // single healthy snack: small cleanliness improvement
+          cleanValue = clamp100(cleanValue + 12.5);
           fadeInfo("🥗 Makanan sehat menambah kebersihan sedikit.");
         }
         break;
+
       default:
         console.warn('Unknown action', action);
     }
