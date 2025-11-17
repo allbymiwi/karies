@@ -3,12 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cariofriends - AR</title>
+  <title>kARies - AR Edukasi Gigi</title>
   <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-
-  <!-- XR Button -->
+  <!-- XR Button (center top) -->
   <button id="xrBtn" class="xr-btn">Enter AR</button>
 
   <!-- AR canvas -->
@@ -20,13 +19,13 @@
       <div class="status-bar clean">
         <img src="icons/water.png" class="status-icon" alt="Kebersihan">
         <span class="status-label">Kebersihan</span>
-        <div class="bar-fill"><div id="cleanFill" class="bar-inner"></div></div>
+        <div class="bar-fill"><div id="cleanFill" class="bar-inner" style="width:100%"></div></div>
       </div>
 
       <div class="status-bar health">
         <img src="icons/heart.png" class="status-icon" alt="Kesehatan">
         <span class="status-label">Kesehatan</span>
-        <div class="bar-fill"><div id="healthFill" class="bar-inner"></div></div>
+        <div class="bar-fill"><div id="healthFill" class="bar-inner" style="width:100%"></div></div>
       </div>
     </div>
 
@@ -48,13 +47,9 @@
         <span>Makanan Manis</span>
       </button>
     </div>
-
-    <!-- EXTRA BUTTONS: container for Reset (and optional Exit) -->
-    <!-- Will be filled/controlled by ui.js. Positioned under #buttons -->
-    <div id="extraButtons" aria-hidden="true"></div>
   </div>
 
-  <!-- UI logic must load BEFORE AR logic so listeners are ready -->
+  <!-- UI logic first -->
   <script src="./ui.js"></script>
 
   <!-- AR logic (module) -->
