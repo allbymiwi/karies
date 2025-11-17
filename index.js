@@ -348,9 +348,9 @@ function animateBrushUpright(wrapper) {
     const initialScale = wrapper.scale.x;
 
     // CONFIG: orbit parameters tuned for top brushing
-    const radius = 0.10;       // small radius so brush covers crown area
-    const revolutions = 2;     // two gentle rotations
-    const orbitDuration = 900; // ms
+    const radius = 0.50;       // small radius so brush covers crown area
+    const revolutions = 3;     // two gentle rotations
+    const orbitDuration = 1200; // ms
     const approachDur = 100;
     const retreatDur = 100;
     const totalOrbitTime = orbitDuration;
@@ -729,3 +729,4 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
