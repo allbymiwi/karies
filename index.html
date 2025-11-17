@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-  
+
   <!-- XR Button -->
   <button id="xrBtn" class="xr-btn">Enter AR</button>
 
@@ -29,7 +29,7 @@
         <div class="bar-fill"><div id="healthFill" class="bar-inner"></div></div>
       </div>
     </div>
-    
+
     <div id="infoText">Arahkan kamera ke lantai dan tekan Enter AR</div>
 
     <div id="buttons">
@@ -48,6 +48,10 @@
         <span>Makanan Manis</span>
       </button>
     </div>
+
+    <!-- EXTRA BUTTONS: container for Reset (and optional Exit) -->
+    <!-- Will be filled/controlled by ui.js. Positioned under #buttons -->
+    <div id="extraButtons" aria-hidden="true"></div>
   </div>
 
   <!-- UI logic must load BEFORE AR logic so listeners are ready -->
