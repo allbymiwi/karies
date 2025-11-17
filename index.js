@@ -1,4 +1,4 @@
-// index.js (ORBIT-ONLY brush) - full file
+// index.js (ORBIT-ONLY brush) - full file (plus xrBtn hide/show)
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -348,9 +348,9 @@ function animateBrushUpright(wrapper) {
     const initialScale = wrapper.scale.x;
 
     // CONFIG: orbit parameters tuned for top brushing
-    const radius = 0.50;       // small radius so brush covers crown area
-    const revolutions = 3;     // two gentle rotations
-    const orbitDuration = 1200; // ms
+    const radius = 0.50;       // orbit radius
+    const revolutions = 3;     // how many revolutions
+    const orbitDuration = 1200; // ms duration
     const approachDur = 100;
     const retreatDur = 100;
     const totalOrbitTime = orbitDuration;
@@ -609,6 +609,10 @@ async function requestXRSession() {
 async function onSessionStarted(session) {
   xrSession = session;
   xrBtn.textContent = 'STOP AR';
+
+  // HIDE (fade) the Enter AR button when AR starts
+  xrBtn.classList.add('hidden');
+
   try {
     await gl.makeXRCompatible();
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
@@ -626,6 +630,10 @@ async function onSessionStarted(session) {
 function onSessionEnded() {
   xrSession = null;
   xrBtn.textContent = 'Enter AR';
+
+  // SHOW (fade in) the Enter AR button when AR ends
+  xrBtn.classList.remove('hidden');
+
   hitTestSourceRequested = false;
   hitTestSource = null;
   renderer.setAnimationLoop(null);
