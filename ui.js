@@ -1,4 +1,5 @@
-/* ui.js - fixed: prevent double-processing & sanity checks so sweet won't unexpectedly zero both bars */
+/* ui.js - robust: match ui-action-request -> interactor-finished (pendingAction),
+   prevent double-processing and accidental multi-increments of sweet stage */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -18,8 +19,11 @@
   let toothStage = 0;
   let healthyCount = 0;
 
-  // Guard to prevent processing the same interactor result twice
+  // Guards
   let processingInteractor = false;
+  let pendingAction = null;
+  let pendingActionTimer = null;
+  const PENDING_ACTION_TIMEOUT = 2500; // ms
 
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
@@ -52,6 +56,29 @@
   }
   setExtraButtonsVisible(false);
 
+  // send ui-action-request and set pendingAction so we only accept matching finished events
+  function sendUIActionRequest(action) {
+    // If there's already a pending action, ignore new requests until processed (prevents rapid double-click)
+    if (pendingAction) {
+      console.warn('ui-action-request ignored: another action pending', { pendingAction, newAction: action });
+      return false;
+    }
+    pendingAction = action;
+    // safety timer to clear pendingAction in case interactor-finished never comes
+    if (pendingActionTimer) clearTimeout(pendingActionTimer);
+    pendingActionTimer = setTimeout(() => {
+      console.warn('pendingAction timed out and cleared', { pendingAction });
+      pendingAction = null;
+      pendingActionTimer = null;
+      // re-enable action buttons if not terminal
+      if (!(cleanValue <= 0 && healthValue <= 0)) setButtonsEnabled(true);
+    }, PENDING_ACTION_TIMEOUT);
+
+    window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action } }));
+    return true;
+  }
+
+  // attach to buttons
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
@@ -59,18 +86,28 @@
         fadeInfo("Model belum siap. Arahkan kamera & tunggu model muncul.");
         return;
       }
+      // disable UI immediately and send action request
       setButtonsEnabled(false);
       fadeInfo("Memainkan animasi...");
-      window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action } }));
+      const ok = sendUIActionRequest(action);
+      if (!ok) {
+        // re-enable briefly so user can try again
+        setTimeout(() => { setButtonsEnabled(true); }, 200);
+      }
     });
   });
 
+  // Reset button -> dispatch reset & update UI state
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
+      // inform AR system to reset scene
       window.dispatchEvent(new CustomEvent('reset'));
+      // reset local UI values & lock actions until model placed again
       resetUIState();
     });
   }
+
+  // Exit AR button -> request exit; index.js will handle ending session
   if (exitBtn) {
     exitBtn.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('request-exit-ar'));
@@ -78,23 +115,42 @@
     });
   }
 
-  // ----------------- interactor-finished (with processing guard) -----------------
+  // ----------------- interactor-finished (with pendingAction + processing guard) -----------------
   window.addEventListener('interactor-finished', (e) => {
-    // Prevent re-entrancy / double-processing
+    // If interactor finished without a pendingAction, ignore it (could be stray)
+    const d = e.detail || {};
+    const action = d.action;
+    const status = d.status;
+
+    if (!pendingAction) {
+      console.warn('interactor-finished ignored: no pendingAction', { action, status });
+      return;
+    }
+
+    // Only process if the finished action matches the pendingAction
+    if (action !== pendingAction) {
+      console.warn('interactor-finished ignored: action mismatch', { pendingAction, action });
+      return;
+    }
+
+    // Prevent re-entrancy
     if (processingInteractor) {
-      console.warn('interactor-finished ignored: already processing previous event');
+      console.warn('interactor-finished ignored: already processing');
       return;
     }
     processingInteractor = true;
 
+    // clear pendingAction timer & value immediately (we will handle result)
+    if (pendingActionTimer) { clearTimeout(pendingActionTimer); pendingActionTimer = null; }
+    pendingAction = null;
+
     try {
-      const d = e.detail || {};
-      const action = d.action;
-      const status = d.status;
       if (status !== 'ok') {
         fadeInfo(status === 'skipped' ? "Animasi tidak dijalankan." : "Terjadi error animasi.");
-        // re-enable UI in non-terminal case
-        setTimeout(() => { setButtonsEnabled(true); }, 300);
+        // re-enable unless terminal
+        setTimeout(() => {
+          if (!(cleanValue <= 0 && healthValue <= 0)) setButtonsEnabled(true);
+        }, 300);
         return;
       }
 
@@ -103,11 +159,11 @@
       updateBars();
       window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue, clean: cleanValue } }));
 
+      // terminal check
       if (cleanValue <= 0 && healthValue <= 0) {
         setButtonsEnabled(false);
-        if (typeof toothStage === 'number' && toothStage >= 8) {
-          // keep final sweet message visible
-        } else {
+        // if from sweet final stage we already showed message - keep it
+        if (!(toothStage >= 8)) {
           fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
         }
         window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_and_clean_zero' } }));
@@ -115,9 +171,8 @@
         setButtonsEnabled(true);
       }
     } finally {
-      // small delay before allowing next interactor event to avoid double-fires
-      // this also handles cases where events inadvertently fire very rapidly
-      setTimeout(() => { processingInteractor = false; }, 250);
+      // small cooldown to avoid very-rapid successive processing
+      setTimeout(() => { processingInteractor = false; }, 150);
     }
   });
 
@@ -150,7 +205,7 @@
     updateBars();
   });
 
-  // ----------------- GAME LOGIC (robust ordering & guards) -----------------
+  // ----------------- GAME LOGIC (same desired order: health-first when pair completes) -----------------
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
@@ -168,35 +223,21 @@
           return;
         }
 
-        // determine nextStage but do not allow accidental big jumps
+        // compute next logical stage
         const nextStage = Math.min(8, toothStage + 1);
 
-        // PROTECTION: if nextStage would become 8 but health is already <= 0 due to other causes,
-        // avoid forcing abrupt double-zero unless it's an intended stage-8 effect.
-        // (we still allow stage 8 to enforce terminal when reached legitimately)
-        if (nextStage === toothStage) {
-          // no stage change - should not happen but guard anyway
-          console.warn('sweet pressed but nextStage == toothStage', { toothStage });
-        }
-
-        // If the action completes a pair (nextStage even) -> health drops FIRST
+        // If the nextStage is even, apply health drop FIRST
         if (nextStage % 2 === 0) {
-          // reduce health by 25 (clamped)
-          const prevHealth = healthValue;
           healthValue = clamp100(healthValue - 25);
-          // debug log if unexpected large drop
-          if (prevHealth - healthValue > 25) console.warn('unexpected health drop', { prevHealth, healthValue, nextStage });
         }
 
         // Then reduce cleanliness relatively
-        const prevClean = cleanValue;
         cleanValue = clamp100(cleanValue - 12.5);
-        if (prevClean - cleanValue > 12.5 + 0.001) console.warn('unexpected clean drop', { prevClean, cleanValue, nextStage });
 
         // commit stage
         toothStage = nextStage;
 
-        // show message per stage
+        // stage messages & final-stage enforcement
         switch (toothStage) {
           case 1:
             fadeInfo("🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!");
@@ -221,14 +262,11 @@
             break;
           case 8:
             fadeInfo("⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!");
-            // enforce terminal state (only here)
             cleanValue = 0;
             healthValue = 0;
             setButtonsEnabled(false);
             window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'karies_parah_stage8' } }));
             break;
-          default:
-            fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
 
@@ -255,6 +293,9 @@
     toothStage = 0; // explicit Reset clears the sweet-stage accumulation
     healthyCount = 0;
     toothReady = false;
+    pendingAction = null;
+    if (pendingActionTimer) { clearTimeout(pendingActionTimer); pendingActionTimer = null; }
+    processingInteractor = false;
     setButtonsEnabled(false);
     updateBars();
     fadeInfo("Model direset, silakan place ulang.");
@@ -264,7 +305,7 @@
     setButtonsEnabled,
     updateBars,
     fadeInfo,
-    _getState: () => ({ cleanValue, healthValue, toothStage, healthyCount, processingInteractor })
+    _getState: () => ({ cleanValue, healthValue, toothStage, healthyCount, pendingAction, processingInteractor })
   };
 
   updateBars();
