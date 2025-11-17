@@ -100,17 +100,32 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   transition: opacity 0.3s ease;
 }
 
-/* XR button */
+/* XR button - CENTERED top */
 .xr-btn {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 40;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
   border: none;
-  background: #0b66ff;
+  background: linear-gradient(180deg,#3c86ff,#0b66ff);
   color: #fff;
-  font-weight:600;
+  font-weight:700;
   cursor:pointer;
+  box-shadow: 0 6px 18px rgba(11,102,255,0.25);
+  transition: opacity 0.28s ease, transform 0.18s ease;
+}
+
+/* hidden state (fade out & disable) */
+.xr-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.96);
+}
+
+/* reset button style (if UI creates it) */
+#resetBtn {
+  transition: opacity 0.2s ease;
 }
