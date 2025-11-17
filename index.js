@@ -1,4 +1,4 @@
-// index.js (brush animation: circular orbit over tooth) - full file
+// index.js (UPDATED) - applied items 1,3,4,5,6,7,8
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -31,9 +31,9 @@ let objectPlaced = false;
 let placedObject = null;
 let currentHealthModelKey = DEFAULT_HEALTH_KEY;
 
-// caches
-const modelCache = {};         // for tooth models (file -> scene)
-const interactorCache = {};    // for interactor models (action -> scene)
+// caches now store { scene, clips? } so animations are preserved
+const modelCache = {};         // file -> { scene, clips }
+const interactorCache = {};    // action -> { scene, clips }
 
 // tmp
 const _pos = new THREE.Vector3();
@@ -68,24 +68,32 @@ function initThree() {
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
   scene = new THREE.Scene();
 
-  // lighting
-  const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+  // lighting improvements (item 5)
+  const ambient = new THREE.AmbientLight(0xffffff, 0.28);
   scene.add(ambient);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+
+  // hemisphere light to give nicer gradient lighting for cavities
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444456, 0.45);
+  hemi.position.set(0, 1, 0);
+  scene.add(hemi);
+
+  const dir = new THREE.DirectionalLight(0xffffff, 0.85);
   dir.position.set(1.5, 3, 2);
   dir.castShadow = true;
   dir.shadow.mapSize.width = 1024;
   dir.shadow.mapSize.height = 1024;
   scene.add(dir);
+
   const rim = new THREE.PointLight(0xfff6d8, 0.6, 6);
   rim.position.set(-1.5, 1.5, -1.5);
   scene.add(rim);
-  spotLight = new THREE.SpotLight(0xffffff, 0.6, 6, Math.PI / 8, 0.3, 1);
+
+  spotLight = new THREE.SpotLight(0xffffff, 1.0, 8, Math.PI / 6, 0.25, 1); // stronger & slightly wider angle
   spotLight.position.set(0.6, 1.8, 0.6);
   spotLight.target.position.set(0, 0, 0);
   spotLight.castShadow = true;
-  spotLight.shadow.mapSize.width = 1024;
-  spotLight.shadow.mapSize.height = 1024;
+  spotLight.shadow.mapSize.width = 2048;
+  spotLight.shadow.mapSize.height = 2048;
   scene.add(spotLight);
   scene.add(spotLight.target);
 
@@ -116,7 +124,7 @@ function initThree() {
     }
     try {
       await runInteractorAnimation(action);
-      // notify UI that animation finished successfully
+      // notify UI that animation finished successfully (UI will update bars and dispatch 'health-changed')
       window.dispatchEvent(new CustomEvent('interactor-finished', { detail: { action, status: 'ok' } }));
     } catch (err) {
       console.warn('interactor anim error', err);
@@ -131,6 +139,11 @@ function initThree() {
     const key = clampHealthKey(health);
     currentHealthModelKey = key;
     if (objectPlaced) swapModelForHealthAfterDelay(key);
+
+    // also broadcast terminal event if health reached zero (item 6)
+    if (health <= 0) {
+      window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_zero' } }));
+    }
   });
 
   // reset listener
@@ -168,7 +181,10 @@ function applyMeshMaterialTweaks(model) {
         if ('metalness' in mat) mat.metalness = Math.min(0.05, mat.metalness || 0);
         if ('roughness' in mat) mat.roughness = Math.min(0.9, (mat.roughness === undefined ? 0.6 : mat.roughness));
         mat.side = THREE.DoubleSide;
-        mat.transparent = true; // enable transparency for fade-outs
+        // keep transparency enabled so fade animations can work
+        mat.transparent = true;
+        // ensure we start fully opaque
+        if (typeof mat.opacity === 'undefined') mat.opacity = 1.0;
         mat.needsUpdate = true;
       }
     }
@@ -176,6 +192,7 @@ function applyMeshMaterialTweaks(model) {
 }
 
 // ---- PRELOAD ALL MODELS (tooth + interactors) ----
+// store both scene and animations (so we can play baked GLB clips)
 function preloadAllModelsAndInteractors() {
   const files = new Set(Object.values(MODEL_MAP).concat(Object.values(INTERACTORS)));
   const promises = [];
@@ -185,13 +202,14 @@ function preloadAllModelsAndInteractors() {
       loader.load(file,
         (gltf) => {
           const node = gltf.scene || gltf.scenes[0];
+          const clips = gltf.animations && gltf.animations.length ? gltf.animations.slice() : [];
           if (!node) { resolve(); return; }
           applyMeshMaterialTweaks(node);
           // store into appropriate cache (store original)
-          if (Object.values(MODEL_MAP).includes(file)) modelCache[file] = node;
+          if (Object.values(MODEL_MAP).includes(file)) modelCache[file] = { scene: node, clips: clips };
           if (Object.values(INTERACTORS).includes(file)) {
             const actionKey = Object.keys(INTERACTORS).find(k => INTERACTORS[k] === file);
-            if (actionKey) interactorCache[actionKey] = node;
+            if (actionKey) interactorCache[actionKey] = { scene: node, clips: clips };
           }
           resolve();
         },
@@ -206,6 +224,17 @@ function preloadAllModelsAndInteractors() {
   return Promise.all(promises);
 }
 
+// clone helper: clone scene and attach clips (if any) to clone.userData._clips
+function cloneSceneWithClips(entry) {
+  // entry = { scene, clips }
+  if (!entry || !entry.scene) return null;
+  const cloned = entry.scene.clone(true);
+  // copy animations (clips) onto userData for later use
+  cloned.userData = cloned.userData || {};
+  cloned.userData._clips = entry.clips ? entry.clips.slice() : [];
+  return cloned;
+}
+
 // spawn interactor (clone cached glb or load fallback)
 async function runInteractorAnimation(action) {
   const file = INTERACTORS[action];
@@ -213,14 +242,21 @@ async function runInteractorAnimation(action) {
 
   // Note: UI already disabled buttons upon request; index.js does not re-enable here.
   let interactorRoot = null;
-  const cached = interactorCache[action];
-  if (cached) interactorRoot = cached.clone(true);
-  else {
+  const cachedEntry = interactorCache[action];
+  if (cachedEntry) {
+    interactorRoot = cloneSceneWithClips(cachedEntry);
+  } else {
     // fallback load
     const gltf = await new Promise((res, rej) => {
       loader.load(file, (g) => res(g), undefined, (err) => rej(err));
     });
-    interactorRoot = gltf.scene || gltf.scenes[0];
+    const node = gltf.scene || gltf.scenes[0];
+    const clips = gltf.animations && gltf.animations.length ? gltf.animations.slice() : [];
+    if (!node) return;
+    applyMeshMaterialTweaks(node);
+    interactorRoot = node.clone(true);
+    interactorRoot.userData = interactorRoot.userData || {};
+    interactorRoot.userData._clips = clips;
   }
 
   if (!placedObject) return;
@@ -230,21 +266,23 @@ async function runInteractorAnimation(action) {
   const localRot = new THREE.Euler();
   const localScale = new THREE.Vector3(1,1,1);
 
+  // === ITEM 1: new recommended brush position & orbit center ===
   if (action === 'brush') {
-    // sikat: a bit above/front for circular orbit
-    localStart.set(0.0, 0.2, 0.0); // above tooth center (adjust if needed)
-    localRot.set(0, 0, 0);       // tilted downwards
-    localScale.set(0.55,0.55,0.55);  // suitable brush size
+    // Recommended natural starting point: slightly above & in front of tooth center,
+    // so the brush orbits around the crown area without being too far.
+    localStart.set(0.0, 0.32, 0.12); // x (right), y (up), z (forward)
+    localRot.set(-1.0, 0.2, 0);      // tilt the brush toward the tooth
+    localScale.set(0.45,0.45,0.45);  // smaller, natural scale
   } else if (action === 'healthy') {
-    // wortel: start high above and a bit in front (will fall)
-    localStart.set(0.0, 1.6, 0.65);
+    // ITEM 3: adjust carrot smaller and start higher so it falls and doesn't appear huge
+    localStart.set(0.0, 1.6, 0.9);
     localRot.set(-0.25, 0, -0.5);
-    localScale.set(0.40,0.40,0.40); // slightly smaller
+    localScale.set(0.34,0.34,0.34);
   } else if (action === 'sweet') {
-    // permen: start higher & further, small
-    localStart.set(0.08, 1.8, 0.7);
+    // ITEM 3: candy smaller and start higher
+    localStart.set(0.08, 1.8, 0.95);
     localRot.set(0, 0.4, 0.8);
-    localScale.set(0.32,0.32,0.32); // smaller
+    localScale.set(0.28,0.28,0.28);
   }
 
   // wrapper group to animate local transforms easily
@@ -261,9 +299,9 @@ async function runInteractorAnimation(action) {
 
   // animate depending on action
   let animPromise = null;
-  if (action === 'brush') animPromise = animateBrush(wrapper);
-  else if (action === 'healthy') animPromise = animateCarrotFade(wrapper); // fade version
-  else if (action === 'sweet') animPromise = animateCandyFade(wrapper);     // fade version
+  if (action === 'brush') animPromise = animateBrushWithPossibleGLB(animatorWrap(wrapper, interactorRoot));
+  else if (action === 'healthy') animPromise = animateCarrotFade(wrapper);
+  else if (action === 'sweet') animPromise = animateCandyFade(wrapper);
   else animPromise = Promise.resolve();
 
   // wait animation finish
@@ -278,11 +316,59 @@ async function runInteractorAnimation(action) {
   return;
 }
 
+// small helper to attach interactor root as second param for brush animation that may play GLB clips
+function animatorWrap(wrapper) {
+  return function getWrapperAndRoot() {
+    // wrapper is the group; first child is the interactor model
+    const root = wrapper.children && wrapper.children[0] ? wrapper.children[0] : null;
+    return { wrapper, root };
+  };
+}
+
 // ---- Anim helpers (simple tweening using requestAnimationFrame) ----
 function lerp(a,b,t){ return a + (b-a)*t; }
 function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
 
-// --- NEW: animateBrush -> circular orbit above tooth
+// animateBrush: tries to play GLB internal animation first, otherwise do circular orbit
+function animateBrushWithPossibleGLB(getPair) {
+  // getPair returns { wrapper, root }
+  const pair = getPair();
+  const wrapper = pair.wrapper;
+  const root = pair.root;
+
+  // if root has clips in userData, play them via AnimationMixer
+  const clips = (root && root.userData && root.userData._clips) ? root.userData._clips : [];
+  if (clips && clips.length) {
+    return new Promise((resolve) => {
+      const mixer = new THREE.AnimationMixer(root);
+      // play first clip (you can choose by name if desired)
+      const clip = clips[0];
+      const action = mixer.clipAction(clip);
+      action.reset();
+      action.play();
+
+      let lastTime = performance.now();
+      function frame(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+        try { mixer.update(dt); } catch (e) { /* ignore */ }
+        // if action finished -> resolve
+        if (action.time >= clip.duration - 0.001) {
+          action.stop();
+          resolve();
+        } else {
+          requestAnimationFrame(frame);
+        }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  // FALLBACK: do circular orbit above tooth (configurable params)
+  return animateBrush(wrapper);
+}
+
+// previous animateBrush function (circular orbit) - uses parameters from earlier convo (item 1)
 function animateBrush(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
@@ -293,24 +379,22 @@ function animateBrush(wrapper) {
     const initialRotZ = wrapper.rotation.z;
     const initialScale = wrapper.scale.x;
 
-    // config: orbit radius (local), number of revolutions, durations (ms)
-    const radius = 0.50;          // orbit radius in local units (adjustable)
-    const revolutions = 5;        // how many circles
-    const orbitDuration = 5000;    // ms total for orbit phase
-    const approachDur = 140;      // move into orbit from slightly farther
-    const retreatDur = 140;       // move back to start and finish
+    // CONFIGURABLE: radius, revolutions, orbitDuration (you can tweak these)
+    const radius = 0.12;          // orbit radius (local units) - set smaller for natural orbit
+    const revolutions = 2;        // number of circles
+    const orbitDuration = 900;    // duration in ms for all revolutions
+    const approachDur = 120;
+    const retreatDur = 120;
     const totalOrbitTime = orbitDuration;
 
-    // We'll do: approach -> orbit (revolutions) -> retreat
     function frame(now) {
       const elapsed = now - start;
 
-      // approach phase: move from slightly farther Z toward cz - 0.06 (closer)
+      // approach phase
       if (elapsed < approachDur) {
         const t = easeInOutQuad(elapsed / approachDur);
-        wrapper.position.z = lerp(cz + 0.05, cz - 0.06, t); // come closer a bit
-        // slight tilt change
-        wrapper.rotation.x = lerp(wrapper.rotation.x, wrapper.rotation.x - 0.05, t);
+        wrapper.position.z = lerp(cz + 0.03, cz - 0.04, t);
+        wrapper.rotation.x = lerp(wrapper.rotation.x, wrapper.rotation.x - 0.03, t);
         requestAnimationFrame(frame);
         return;
       }
@@ -320,42 +404,35 @@ function animateBrush(wrapper) {
 
       // orbit phase
       if (elapsed >= orbitStart && elapsed < orbitEnd) {
-        const t = (elapsed - orbitStart) / (orbitEnd - orbitStart); // 0..1 through orbit
+        const t = (elapsed - orbitStart) / (orbitEnd - orbitStart); // 0..1
         const eased = easeInOutQuad(t);
-        const angle = eased * revolutions * Math.PI * 2; // radians progressed
-        // compute circular position in local coordinates (around tooth center)
+        const angle = eased * revolutions * Math.PI * 2;
         const ox = cx + Math.cos(angle) * radius;
-        const oy = cy + Math.sin(angle) * (radius * 0.45); // elliptical: less vertical radius
-        // slight vertical bob to simulate contact
-        const contact = 0.02 * Math.sin(angle * 4); // small wiggle
+        const oy = cy + Math.sin(angle) * (radius * 0.45);
+        const contact = 0.015 * Math.sin(angle * 4);
         wrapper.position.x = ox;
-        wrapper.position.y = oy - Math.abs(contact); // dip slightly on contact parts
-        // rotate brush head a bit to follow motion for realism
-        wrapper.rotation.z = initialRotZ + Math.sin(angle) * 0.25;
-        wrapper.rotation.x = -0.85 + Math.cos(angle * 2) * 0.06;
-        // maybe a tiny scale pulse to suggest pressure
-        wrapper.scale.setScalar(initialScale * (1 + 0.02 * Math.sin(angle * 3)));
+        wrapper.position.y = oy - Math.abs(contact);
+        wrapper.rotation.z = initialRotZ + Math.sin(angle) * 0.18;
+        wrapper.rotation.x = -1.0 + Math.cos(angle * 2) * 0.04;
+        wrapper.scale.setScalar(initialScale * (1 + 0.015 * Math.sin(angle * 3)));
         requestAnimationFrame(frame);
         return;
       }
 
-      // retreat phase: move back to original local pos and rotation
+      // retreat
       if (elapsed >= orbitEnd && elapsed < orbitEnd + retreatDur) {
         const t2 = (elapsed - orbitEnd) / retreatDur;
         const tt2 = easeInOutQuad(t2);
-        // interpolate position from current to original (cx,cy,cz)
         wrapper.position.x = lerp(wrapper.position.x, cx, tt2);
         wrapper.position.y = lerp(wrapper.position.y, cy, tt2);
         wrapper.position.z = lerp(wrapper.position.z, cz, tt2);
-        // reset rotation & scale
         wrapper.rotation.z = lerp(wrapper.rotation.z, initialRotZ, tt2);
-        wrapper.rotation.x = lerp(wrapper.rotation.x, -0.85, tt2);
+        wrapper.rotation.x = lerp(wrapper.rotation.x, -1.0, tt2);
         wrapper.scale.setScalar(lerp(wrapper.scale.x, initialScale, tt2));
         requestAnimationFrame(frame);
         return;
       }
 
-      // done
       resolve();
     }
 
@@ -363,25 +440,24 @@ function animateBrush(wrapper) {
   });
 }
 
-// --- FIXED: animate carrot with fade-out (fall -> bounce -> fade) using initialScale
+// --- carrot fall + fade (uses initialScale to avoid exploding) ---
 function animateCarrotFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
     const startY = wrapper.position.y;
     const startZ = wrapper.position.z;
-    const initialScale = wrapper.scale.x;    // capture initial scale
-    const fall = 420; // fall time
+    const initialScale = wrapper.scale.x;
+    const fall = 420;
     const bounce = 180;
     const fade = 260;
 
-    // set initial material opacity to 1
     wrapper.traverse((c) => { if (c.isMesh && c.material) c.material.opacity = 1.0; });
 
     function frame(now) {
       const elapsed = now - start;
       if (elapsed < fall) {
         const t = Math.min(1, elapsed / fall);
-        const tt = t * t; // ease-in for gravity feel
+        const tt = t * t;
         wrapper.position.y = lerp(startY, startY - 1.05, tt);
         wrapper.position.z = lerp(startZ, startZ - 0.45, tt);
         requestAnimationFrame(frame);
@@ -389,8 +465,7 @@ function animateCarrotFade(wrapper) {
       }
       if (elapsed < fall + bounce) {
         const t2 = (elapsed - fall) / bounce;
-        const pulse = Math.sin(t2 * Math.PI); // 0..1..0
-        // scale relative to initialScale (no absolute jump)
+        const pulse = Math.sin(t2 * Math.PI);
         const scaleFactor = lerp(0.9, 1.02, pulse);
         wrapper.scale.setScalar(initialScale * scaleFactor);
         wrapper.position.y = lerp(startY - 1.05, startY - 0.92, pulse * 0.6);
@@ -400,35 +475,32 @@ function animateCarrotFade(wrapper) {
       if (elapsed < fall + bounce + fade) {
         const t3 = (elapsed - fall - bounce) / fade;
         const tt3 = easeInOutQuad(t3);
-        // fade opacity to 0
         wrapper.traverse((c) => {
           if (c.isMesh && c.material) c.material.opacity = 1 - tt3;
         });
-        // slight upward move while fading
         wrapper.position.y = lerp(startY - 0.92, startY + 0.45, tt3);
-        // shrink relative to initial
         wrapper.scale.setScalar(initialScale * lerp(1.02, 0.02, tt3));
         requestAnimationFrame(frame);
         return;
       }
       resolve();
     }
+
     requestAnimationFrame(frame);
   });
 }
 
-// --- FIXED: animate candy with fade-out using initialScale
+// --- candy fall + fade (uses initialScale) ---
 function animateCandyFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
     const startY = wrapper.position.y;
     const startZ = wrapper.position.z;
-    const initialScale = wrapper.scale.x; // capture initial scale
+    const initialScale = wrapper.scale.x;
     const fall = 320;
     const stick = 260;
     const fade = 220;
 
-    // set initial material opacity to 1
     wrapper.traverse((c) => { if (c.isMesh && c.material) c.material.opacity = 1.0; });
 
     function frame(now) {
@@ -461,6 +533,7 @@ function animateCandyFade(wrapper) {
       }
       resolve();
     }
+
     requestAnimationFrame(frame);
   });
 }
@@ -479,7 +552,7 @@ function swapModelForHealthAfterDelay(healthKey) {
   if (placedObject) placedObject.matrixWorld.decompose(pos, quat, scl);
   else reticle.matrix.decompose(pos, quat, scl);
 
-  const cached = modelCache[modelFile];
+  const cachedEntry = modelCache[modelFile];
 
   (async () => {
     // replace model immediately (no fancy scale animation).
@@ -488,8 +561,8 @@ function swapModelForHealthAfterDelay(healthKey) {
       placedObject = null;
     }
 
-    if (cached) {
-      const newModel = cached.clone(true);
+    if (cachedEntry) {
+      const newModel = cloneSceneWithClips(cachedEntry);
       newModel.position.copy(pos);
       newModel.quaternion.copy(quat);
       newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
@@ -546,7 +619,7 @@ async function requestXRSession() {
     const supported = await navigator.xr.isSessionSupported('immersive-ar');
     if (!supported) throw new Error('immersive-ar tidak didukung pada device/browser ini.');
 
-    // preload everything (tooth + interactors)
+    // preload everything (tooth + interactors) - item 7
     await preloadAllModelsAndInteractors();
 
     const session = await navigator.xr.requestSession('immersive-ar', {
@@ -601,9 +674,9 @@ function onSelect() {
 
   reticle.matrix.decompose(_pos, _quat, _scale);
   const file = MODEL_MAP[DEFAULT_HEALTH_KEY];
-  const cached = modelCache[file];
-  if (cached) {
-    const newModel = cached.clone(true);
+  const cachedEntry = modelCache[file];
+  if (cachedEntry) {
+    const newModel = cloneSceneWithClips(cachedEntry);
     newModel.position.copy(_pos);
     newModel.quaternion.copy(_quat);
     newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
