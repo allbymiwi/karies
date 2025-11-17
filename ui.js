@@ -154,49 +154,39 @@
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
-        // brushing restores both (and resets counters)
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
         sweetCount = 0; healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
-
       case 'sweet':
-        // increment counter first, apply health penalty first if it's the triggering hit,
-        // then always reduce cleanliness a bit.
+        // FIRST: update counters and apply any health penalty (so health changes show first)
         sweetCount++;
         if (sweetCount >= 2) {
           sweetCount = 0;
-          // health penalty applied first (as requested)
+          // apply health penalty first so UI shows health change before cleanliness reduction
           healthValue = clamp100(healthValue - 25);
-          // then decrease cleanliness (still happens)
+          // then also decrease cleanliness
           cleanValue = clamp100(cleanValue - 12.5);
           fadeInfo("🍭 Terlalu sering makan manis — kesehatan turun 25%!");
         } else {
-          // first sweet: only small cleanliness drop
+          // single sweet: still reduce cleanliness but health untouched
           cleanValue = clamp100(cleanValue - 12.5);
           fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
-
       case 'healthy':
-        // similar logic to 'sweet' but positive: count towards health gain,
-        // apply health gain first when threshold reached, then apply cleanliness change.
+        // Keep existing healthy logic but apply cleanliness first, then health bump when threshold reached
+        cleanValue = clamp100(cleanValue + 12.5);
         healthyCount++;
         if (healthyCount >= 2) {
           healthyCount = 0;
-          // health boost applied first
           healthValue = clamp100(healthValue + 25);
-          // small cleanliness increase still applied
-          cleanValue = clamp100(cleanValue + 12.5);
           fadeInfo("🥦 Makanan sehat membantu — kesehatan naik 25%!");
         } else {
-          // single healthy snack: small cleanliness improvement
-          cleanValue = clamp100(cleanValue + 12.5);
           fadeInfo("🥗 Makanan sehat menambah kebersihan sedikit.");
         }
         break;
-
       default:
         console.warn('Unknown action', action);
     }
