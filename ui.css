@@ -1,29 +1,141 @@
-/* === RESET BUTTON (center bottom) === */
-#extraButtons {
+/* ui.css (updated positions)
+   - #bars moved down a bit
+   - #buttons + infoText moved up from bottom
+*/
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: "Poppins", sans-serif;
+  background: #000;
+}
+
+/* canvas penuh */
+canvas { display:block; width:100vw; height:100vh; position: absolute; }
+
+/* UI Overlay */
+#ui {
   position: absolute;
-  bottom: 28px; /* jarak dari bawah */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  pointer-events: none;
+}
+
+/* STATUS BARS
+   ===== moved DOWN a bit: top increased from 18px -> 60px ===== */
+#bars {
+  position: absolute;
+  top: 60px; /* <- diturunkan sedikit */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  pointer-events: none;
+  z-index: 50;
+}
 
+.status-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(60, 60, 60, 0.9);
+  border-radius: 20px;
+  padding: 6px 12px;
+  min-width: 300px;
+  height: 36px;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+}
+
+.status-icon { width: 28px; height: 28px; margin-right: 8px; }
+.status-label { color:#fff; font-size:13px; font-weight:600; margin-right:8px; min-width:75px; }
+
+.bar-fill { flex:1; height:26px; border-radius:10px; background:#555; overflow:hidden; position:relative; }
+.bar-inner { height:100%; width:100%; border-radius:10px; transition: width 0.3s ease; }
+
+/* warna */
+.clean .bar-inner { background: linear-gradient(to right, #4fc3f7, #0288d1); }
+.health .bar-inner { background: linear-gradient(to right, #ef9a9a, #e57373); }
+.bar-inner.damage { animation: blinkRed 0.4s ease; }
+@keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
+
+/* Buttons container
+   ===== moved UP a bit: increase margin-bottom so container sits higher ===== */
+#buttons {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 96px; /* <- naikkan agar tombol bergerak ke atas (default sebelumnya ~25px) */
   pointer-events: auto;
-  opacity: 0;
-  transition: opacity .25s ease, transform .25s ease;
+  z-index: 45;
 }
 
-#extraButtons.active {
-  opacity: 1;
+.action-btn {
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  background:none; border:none; cursor:pointer; transition: transform 0.15s ease;
+}
+.action-btn img {
+  width:65px; height:65px; border-radius:50%; box-shadow:0 3px 8px rgba(0,0,0,0.25);
+  margin-bottom:4px; object-fit:contain; padding:10px; background:#fff;
+}
+.action-btn span { font-size:13px; font-weight:600; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,0.4); }
+
+/* background color circles */
+.action-btn.brush img { background:#b2e8ff; }
+.action-btn.healthy img { background:#c8f7c2; }
+.action-btn.sweet img { background:#ffd4e1; }
+
+/* info text (di atas tombol) */
+#infoText {
+  background: rgba(255,255,255,0.95);
+  border-radius: 15px;
+  padding: 8px 14px;
+  margin-bottom: 14px; /* sedikit lebih besar agar ada ruang antara info & tombol */
+  font-size:13px;
+  font-weight:500;
+  color: #0b4f8a;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  text-align:center;
+  max-width:380px;
+  pointer-events:auto;
+  transition: opacity 0.3s ease;
+  z-index: 46;
 }
 
-/* style tombol reset */
-#resetBtn {
-  padding: 12px 22px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 18px;
+/* XR button - CENTERED top */
+.xr-btn {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 8px 14px;
+  border-radius: 12px;
   border: none;
-  cursor: pointer;
-  background: linear-gradient(180deg,#5bb0ff,#2177ff);
+  background: linear-gradient(180deg,#3c86ff,#0b66ff);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  font-weight:700;
+  cursor:pointer;
+  box-shadow: 0 6px 18px rgba(11,102,255,0.25);
+  transition: opacity 0.28s ease, transform 0.18s ease;
+}
+
+/* hidden state (fade out & disable) */
+.xr-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.96);
+}
+
+/* reset button style (if UI creates it) */
+#resetBtn {
+  transition: opacity 0.2s ease;
 }
