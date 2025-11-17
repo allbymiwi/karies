@@ -6,6 +6,10 @@
   const buttons = Array.from(document.querySelectorAll('.action-btn'));
   const xrBtn = document.getElementById('xrBtn');
 
+  // NEW extra buttons
+  const resetBtn = document.getElementById('resetBtn');
+  const exitBtn = document.getElementById('exitBtn');
+
   let toothReady = false;
   let cleanValue = 100;
   let healthValue = 100;
@@ -22,6 +26,17 @@
       b.tabIndex = enabled ? 0 : -1;
       if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
     });
+    // extra buttons (reset/exit) remain interactive even when action buttons are disabled
+    if (resetBtn) {
+      resetBtn.style.opacity = '1';
+      resetBtn.style.pointerEvents = 'auto';
+      resetBtn.tabIndex = 0;
+    }
+    if (exitBtn) {
+      exitBtn.style.opacity = '1';
+      exitBtn.style.pointerEvents = 'auto';
+      exitBtn.tabIndex = 0;
+    }
   }
   setButtonsEnabled(false);
 
@@ -54,6 +69,24 @@
       window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action } }));
     });
   });
+
+  // Reset button -> dispatch reset & update UI state
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      // inform AR system to reset scene
+      window.dispatchEvent(new CustomEvent('reset'));
+      // reset local UI values & lock actions until model placed again
+      resetUIState();
+    });
+  }
+
+  // Exit AR button -> request exit; index.js will handle ending session
+  if (exitBtn) {
+    exitBtn.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('request-exit-ar'));
+      fadeInfo("Meminta keluar AR...");
+    });
+  }
 
   // when an interactor animation finished, index.js dispatches this event
   // { action, status }
@@ -151,6 +184,18 @@
       default:
         console.warn('Unknown action', action);
     }
+  }
+
+  // NEW: reset local UI state
+  function resetUIState() {
+    cleanValue = 100;
+    healthValue = 100;
+    sweetCount = 0;
+    healthyCount = 0;
+    toothReady = false;
+    setButtonsEnabled(false);
+    updateBars();
+    fadeInfo("Model direset, silakan place ulang.");
   }
 
   // expose for debugging

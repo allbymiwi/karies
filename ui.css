@@ -126,3 +126,31 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   pointer-events: none;
   transform: translateX(-50%) scale(0.96);
 }
+
+/* Extra Buttons (Reset & Exit) */
+#extraButtons {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 40px;
+  pointer-events: auto;
+  z-index: 45;
+}
+
+.extra-btn {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, #444, #222);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  transition: transform 0.15s ease, opacity 0.2s ease;
+}
+
+.extra-btn:active {
+  transform: scale(0.94);
+}

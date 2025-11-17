@@ -151,6 +151,13 @@ function initThree() {
     }
     objectPlaced = false;
     currentHealthModelKey = DEFAULT_HEALTH_KEY;
+    // also hide reticle so user re-place (reticle will show when hit-test resumes)
+    reticle.visible = false;
+  });
+
+  // NEW: respond to exit request from UI
+  window.addEventListener('request-exit-ar', () => {
+    endXRSession();
   });
 
   console.log('index.js loaded. Ready.');
@@ -613,6 +620,9 @@ async function onSessionStarted(session) {
   // HIDE (fade) the Enter AR button when AR starts
   xrBtn.classList.add('hidden');
 
+  // INFORM UI that XR started
+  window.dispatchEvent(new CustomEvent('xr-started'));
+
   try {
     await gl.makeXRCompatible();
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
@@ -633,6 +643,9 @@ function onSessionEnded() {
 
   // SHOW (fade in) the Enter AR button when AR ends
   xrBtn.classList.remove('hidden');
+
+  // INFORM UI that XR ended
+  window.dispatchEvent(new CustomEvent('xr-ended'));
 
   hitTestSourceRequested = false;
   hitTestSource = null;
