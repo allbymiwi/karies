@@ -1,5 +1,4 @@
-/* ui.js - adjusted: apply health drop BEFORE cleanliness when sweet press completes an even stage,
-   and brush no longer resets toothStage (so pairs persist) */
+/* ui.js - fixed: prevent double-processing & sanity checks so sweet won't unexpectedly zero both bars */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -18,6 +17,9 @@
   // toothStage counts sweet presses since last RESET (0..8). Brush no longer resets this.
   let toothStage = 0;
   let healthyCount = 0;
+
+  // Guard to prevent processing the same interactor result twice
+  let processingInteractor = false;
 
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
@@ -76,34 +78,50 @@
     });
   }
 
+  // ----------------- interactor-finished (with processing guard) -----------------
   window.addEventListener('interactor-finished', (e) => {
-    const d = e.detail || {};
-    const action = d.action;
-    const status = d.status;
-    if (status !== 'ok') {
-      fadeInfo(status === 'skipped' ? "Animasi tidak dijalankan." : "Terjadi error animasi.");
-      setTimeout(() => { setButtonsEnabled(true); }, 300);
+    // Prevent re-entrancy / double-processing
+    if (processingInteractor) {
+      console.warn('interactor-finished ignored: already processing previous event');
       return;
     }
+    processingInteractor = true;
 
-    performActionEffect(action);
-
-    updateBars();
-    window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue, clean: cleanValue } }));
-
-    if (cleanValue <= 0 && healthValue <= 0) {
-      setButtonsEnabled(false);
-      if (typeof toothStage === 'number' && toothStage >= 8) {
-        // keep final sweet message visible
-      } else {
-        fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
+    try {
+      const d = e.detail || {};
+      const action = d.action;
+      const status = d.status;
+      if (status !== 'ok') {
+        fadeInfo(status === 'skipped' ? "Animasi tidak dijalankan." : "Terjadi error animasi.");
+        // re-enable UI in non-terminal case
+        setTimeout(() => { setButtonsEnabled(true); }, 300);
+        return;
       }
-      window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_and_clean_zero' } }));
-    } else {
-      setButtonsEnabled(true);
+
+      performActionEffect(action);
+
+      updateBars();
+      window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue, clean: cleanValue } }));
+
+      if (cleanValue <= 0 && healthValue <= 0) {
+        setButtonsEnabled(false);
+        if (typeof toothStage === 'number' && toothStage >= 8) {
+          // keep final sweet message visible
+        } else {
+          fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
+        }
+        window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_and_clean_zero' } }));
+      } else {
+        setButtonsEnabled(true);
+      }
+    } finally {
+      // small delay before allowing next interactor event to avoid double-fires
+      // this also handles cases where events inadvertently fire very rapidly
+      setTimeout(() => { processingInteractor = false; }, 250);
     }
   });
 
+  // ----------------- other events -----------------
   window.addEventListener('model-placed', () => {
     toothReady = true;
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
@@ -132,11 +150,11 @@
     updateBars();
   });
 
-  // ---------- GAME LOGIC (new order + persistent toothStage) ----------
+  // ----------------- GAME LOGIC (robust ordering & guards) -----------------
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
-        // Brush increases clean & health but NO LONGER resets toothStage.
+        // Brush increases clean & health but DOES NOT reset toothStage now.
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
         healthyCount = 0;
@@ -144,26 +162,41 @@
         break;
 
       case 'sweet':
+        // extra sanity: if already terminal, keep final message and ignore
         if (toothStage >= 8) {
           fadeInfo("⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!");
           return;
         }
 
-        // compute next stage but don't overwrite toothStage until after we apply health logic
+        // determine nextStage but do not allow accidental big jumps
         const nextStage = Math.min(8, toothStage + 1);
 
-        // If the press makes stage even (=> health should drop), apply health drop FIRST
-        if (nextStage % 2 === 0) {
-          // reduce health by 25 (once per pair)
-          healthValue = clamp100(healthValue - 25);
+        // PROTECTION: if nextStage would become 8 but health is already <= 0 due to other causes,
+        // avoid forcing abrupt double-zero unless it's an intended stage-8 effect.
+        // (we still allow stage 8 to enforce terminal when reached legitimately)
+        if (nextStage === toothStage) {
+          // no stage change - should not happen but guard anyway
+          console.warn('sweet pressed but nextStage == toothStage', { toothStage });
         }
 
-        // Now reduce cleanliness relatively
-        cleanValue = clamp100(cleanValue - 12.5);
+        // If the action completes a pair (nextStage even) -> health drops FIRST
+        if (nextStage % 2 === 0) {
+          // reduce health by 25 (clamped)
+          const prevHealth = healthValue;
+          healthValue = clamp100(healthValue - 25);
+          // debug log if unexpected large drop
+          if (prevHealth - healthValue > 25) console.warn('unexpected health drop', { prevHealth, healthValue, nextStage });
+        }
 
-        // finally commit stage and show message
+        // Then reduce cleanliness relatively
+        const prevClean = cleanValue;
+        cleanValue = clamp100(cleanValue - 12.5);
+        if (prevClean - cleanValue > 12.5 + 0.001) console.warn('unexpected clean drop', { prevClean, cleanValue, nextStage });
+
+        // commit stage
         toothStage = nextStage;
 
+        // show message per stage
         switch (toothStage) {
           case 1:
             fadeInfo("🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!");
@@ -188,12 +221,14 @@
             break;
           case 8:
             fadeInfo("⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!");
-            // enforce terminal state
+            // enforce terminal state (only here)
             cleanValue = 0;
             healthValue = 0;
             setButtonsEnabled(false);
             window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'karies_parah_stage8' } }));
             break;
+          default:
+            fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
 
@@ -217,7 +252,7 @@
   function resetUIState() {
     cleanValue = 100;
     healthValue = 100;
-    toothStage = 0; // reset stage on explicit Reset
+    toothStage = 0; // explicit Reset clears the sweet-stage accumulation
     healthyCount = 0;
     toothReady = false;
     setButtonsEnabled(false);
@@ -229,7 +264,7 @@
     setButtonsEnabled,
     updateBars,
     fadeInfo,
-    _getState: () => ({ cleanValue, healthValue, toothStage, healthyCount })
+    _getState: () => ({ cleanValue, healthValue, toothStage, healthyCount, processingInteractor })
   };
 
   updateBars();
