@@ -1,5 +1,4 @@
-// index.js (UPDATED: brush upright + orbit-top behavior)
-// All other features preserved: preloading with clips, carrot/candy fall+fade, lighting, swap-on-health, terminal event
+// index.js (ORBIT-ONLY brush) - full file
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -332,11 +331,12 @@ function animateBrushWithPossibleGLB(getPair) {
     });
   }
 
-  // FALLBACK: upright orbit at top of crown
+  // FALLBACK: upright orbit at top of crown (orbit-only, no spin)
   return animateBrushUpright(wrapper);
 }
 
 // animateBrushUpright: orbit above tooth, brush stays upright (rotation.x kept near 0)
+// NO helicopter spin — only orbit movement and slight sweep rotation (z) for visual
 function animateBrushUpright(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
@@ -345,13 +345,12 @@ function animateBrushUpright(wrapper) {
     const cy = wrapper.position.y;
     const cz = wrapper.position.z;
     const initialRotZ = wrapper.rotation.z;
-    const initialRotX = wrapper.rotation.x; // should be 0 (upright)
     const initialScale = wrapper.scale.x;
 
     // CONFIG: orbit parameters tuned for top brushing
-    const radius = 0.50;       // small radius so brush covers crown area
+    const radius = 0.10;       // small radius so brush covers crown area
     const revolutions = 2;     // two gentle rotations
-    const orbitDuration = 1000; // ms
+    const orbitDuration = 900; // ms
     const approachDur = 100;
     const retreatDur = 100;
     const totalOrbitTime = orbitDuration;
@@ -363,7 +362,6 @@ function animateBrushUpright(wrapper) {
       if (elapsed < approachDur) {
         const t = easeInOutQuad(elapsed / approachDur);
         wrapper.position.z = lerp(cz + 0.02, cz - 0.03, t); // come slightly closer
-        // keep upright: gently ensure rot.x -> 0
         wrapper.rotation.x = lerp(wrapper.rotation.x, 0, t);
         requestAnimationFrame(frame);
         return;
@@ -387,15 +385,10 @@ function animateBrushUpright(wrapper) {
         wrapper.position.x = ox;
         wrapper.position.y = oy - contactDip;
 
-        // keep brush upright: rot.x near 0. rotate around Z a bit to give sense of sweeping
+        // keep brush upright: rot.x near 0
         wrapper.rotation.x = 0;
+        // small sweep rotation around Z for visual sweeping (not spinning the head)
         wrapper.rotation.z = initialRotZ + Math.sin(angle * 2) * 0.06;
-
-        // spin the brush around its own axis slightly to mimic brushing (optional small)
-        // we rotate the root if present for visual sweep
-        if (wrapper.children && wrapper.children[0]) {
-          wrapper.children[0].rotation.y = angle * 0.8; // rotate the brush head a bit
-        }
 
         // tiny scale pulse for pressure feel
         wrapper.scale.setScalar(initialScale * (1 + 0.01 * Math.sin(angle * 4)));
@@ -412,9 +405,6 @@ function animateBrushUpright(wrapper) {
         wrapper.position.y = lerp(wrapper.position.y, cy, tt2);
         wrapper.position.z = lerp(wrapper.position.z, cz, tt2);
         wrapper.rotation.z = lerp(wrapper.rotation.z, initialRotZ, tt2);
-        if (wrapper.children && wrapper.children[0]) {
-          wrapper.children[0].rotation.y = lerp(wrapper.children[0].rotation.y || 0, 0, tt2);
-        }
         wrapper.scale.setScalar(lerp(wrapper.scale.x, initialScale, tt2));
         requestAnimationFrame(frame);
         return;
@@ -739,4 +729,3 @@ function render(time, frame) {
 
 // initialize
 initThree();
-
