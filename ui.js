@@ -1,4 +1,4 @@
-/* ui.js - clean UI wiring (no reset, no extra buttons) */
+/* ui.js - clean UI wiring (extra buttons visible only in AR) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -6,7 +6,8 @@
   const buttons = Array.from(document.querySelectorAll('.action-btn'));
   const xrBtn = document.getElementById('xrBtn');
 
-  // NEW extra buttons
+  // NEW: references to extra buttons container + buttons
+  const extraButtons = document.getElementById('extraButtons');
   const resetBtn = document.getElementById('resetBtn');
   const exitBtn = document.getElementById('exitBtn');
 
@@ -18,7 +19,7 @@
   let sweetCount = 0;
   let healthyCount = 0;
 
-  // initially buttons disabled until model placed
+  // initially action buttons disabled until model placed
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
       b.style.opacity = enabled ? '1' : '0.55';
@@ -26,17 +27,7 @@
       b.tabIndex = enabled ? 0 : -1;
       if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
     });
-    // extra buttons (reset/exit) remain interactive even when action buttons are disabled
-    if (resetBtn) {
-      resetBtn.style.opacity = '1';
-      resetBtn.style.pointerEvents = 'auto';
-      resetBtn.tabIndex = 0;
-    }
-    if (exitBtn) {
-      exitBtn.style.opacity = '1';
-      exitBtn.style.pointerEvents = 'auto';
-      exitBtn.tabIndex = 0;
-    }
+    // DO NOT force extraButtons here — visibility is controlled by xr-started/xr-ended
   }
   setButtonsEnabled(false);
 
@@ -54,6 +45,15 @@
       info.style.opacity = 1;
     }, 160);
   }
+
+  // show/hide extra buttons (called on xr-started/xr-ended)
+  function setExtraButtonsVisible(visible) {
+    if (!extraButtons) return;
+    if (visible) extraButtons.classList.add('visible');
+    else extraButtons.classList.remove('visible');
+  }
+  // ensure hidden by default
+  setExtraButtonsVisible(false);
 
   // handle clicks -> request animation in index.js
   buttons.forEach(btn => {
@@ -128,15 +128,19 @@
     updateBars();
   });
 
-  // when XR started: hide Enter AR button
+  // when XR started: hide Enter AR button + show extra buttons
   window.addEventListener('xr-started', () => {
     if (xrBtn) xrBtn.classList.add('hidden');
+    // show reset/exit now AR active
+    setExtraButtonsVisible(true);
     fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
   });
 
-  // when XR ended: show Enter AR again and lock UI
+  // when XR ended: show Enter AR again, hide extra buttons, and lock UI
   window.addEventListener('xr-ended', () => {
     if (xrBtn) xrBtn.classList.remove('hidden');
+    // hide reset/exit after AR ends
+    setExtraButtonsVisible(false);
     toothReady = false;
     setButtonsEnabled(false);
     fadeInfo("AR berhenti. Arahkan kamera ke lantai dan tekan Enter AR.");
