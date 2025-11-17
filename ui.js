@@ -1,4 +1,4 @@
-/* ui.js (updated) — Reset button appears when AR starts and positioned under the action buttons) */
+/* ui.js (updated) — updates bars only after interactor animation finishes) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -13,10 +13,9 @@
   let sweetCount = 0;    // 2x sweet -> health -25
   let healthyCount = 0;  // 2x healthy -> health +25
 
-  // reset button element (may be created on XR start)
+  // reset button element (created when needed)
   let resetBtnEl = null;
 
-  // helper to enable/disable action buttons
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
       b.style.opacity = enabled ? '1' : '0.55';
@@ -31,45 +30,28 @@
   // helper: clamp value 0..100 with 2 decimals
   function clamp100(v) { return Math.max(0, Math.min(100, Math.round(v * 100) / 100)); }
 
-  // create reset button and attach UNDER the #buttons container
+  // create reset button (only once) and attach to DOM
   function createResetButton() {
     if (resetBtnEl) return resetBtnEl;
-
-    const container = document.getElementById('extraButtons') || (() => {
-      // create container if not present
-      const c = document.createElement('div');
-      c.id = 'extraButtons';
-      const ui = document.getElementById('ui') || document.body;
-      const buttonsEl = document.getElementById('buttons');
-      if (buttonsEl && buttonsEl.parentElement) {
-        buttonsEl.parentElement.insertBefore(c, buttonsEl.nextSibling);
-      } else {
-        ui.appendChild(c);
-      }
-      return c;
-    })();
-
     resetBtnEl = document.createElement('button');
     resetBtnEl.id = 'resetBtn';
     resetBtnEl.textContent = 'Reset';
-    resetBtnEl.addEventListener('click', onResetClicked);
-
-    // Ensure style (if ui.css not loaded yet) - default is in CSS but we keep safe fallback
     Object.assign(resetBtnEl.style, {
-      padding: '10px 18px',
-      fontSize: '14px',
-      fontWeight: '600',
-      borderRadius: '12px',
-      border: 'none',
-      cursor: 'pointer',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+      position: 'absolute',
+      bottom: '18px',
+      right: '16px',
+      zIndex: '60',
+      padding: '10px 14px',
+      borderRadius: '10px',
+      background: '#ff5252',
       color: '#fff',
-      background: 'linear-gradient(180deg,#5bb0ff,#2177ff)'
+      border: 'none',
+      fontWeight: '700',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+      cursor: 'pointer',
     });
-
-    container.appendChild(resetBtnEl);
-    container.setAttribute('aria-hidden', 'false');
-
+    resetBtnEl.addEventListener('click', onResetClicked);
+    document.body.appendChild(resetBtnEl);
     return resetBtnEl;
   }
 
@@ -78,8 +60,6 @@
     resetBtnEl.removeEventListener('click', onResetClicked);
     if (resetBtnEl.parentElement) resetBtnEl.parentElement.removeChild(resetBtnEl);
     resetBtnEl = null;
-    const container = document.getElementById('extraButtons');
-    if (container) container.setAttribute('aria-hidden', 'true');
   }
 
   function onResetClicked() {
@@ -94,8 +74,8 @@
     fadeInfo("Pengalaman di-reset. Tempatkan model lagi untuk memulai ulang.");
     // Disable action buttons until model-placed again
     setButtonsEnabled(false);
-    // Keep reset button present (user wanted reset available from AR start),
-    // so we don't remove it here; it remains until AR ends.
+    // remove reset button after clicked (it can be re-created later if needed)
+    removeResetButton();
   }
 
   // notify AR UI that model is placed -> enable UI and sync health
@@ -104,18 +84,6 @@
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
     setButtonsEnabled(true);
     updateBars();
-  });
-
-  // also show reset as soon as AR starts (so it's available from the beginning of AR)
-  window.addEventListener('xr-started', () => {
-    createResetButton();
-  });
-
-  // hide/reset button when AR ends
-  window.addEventListener('xr-ended', () => {
-    removeResetButton();
-    // also ensure UI lock
-    setButtonsEnabled(false);
   });
 
   // handle interactor finished notifications from index.js
@@ -135,7 +103,7 @@
     // update UI & dispatch health-changed for model swap
     updateBars();
     window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue } }));
-    // check terminal condition and either enable buttons or show terminal message
+    // check terminal condition and either enable buttons or show reset
     checkTerminalState();
   });
 
@@ -214,16 +182,14 @@
     const terminal = (cleanValue <= 0 && healthValue <= 0);
     if (!terminal) setButtonsEnabled(true);
     else {
-      // Terminal - lock buttons, show terminal message and keep reset available
-      setButtonsEnabled(false);
-      fadeInfo("⚠️ Gigi sudah rusak parah — struktur gigi rusak, infeksi mencapai ujung akar. Perawatan terakhir: saluran akar atau pencabutan. Tidak bisa diperbaiki di aplikasi ini.");
+      // leave locked and show reset
       createResetButton();
     }
   }
 
   function checkTerminalState() {
     if (cleanValue <= 0 && healthValue <= 0) {
-      // Terminal condition: lock and show terminal message (reset remains)
+      // Terminal condition: lock, show irreversible message and reset button
       setButtonsEnabled(false);
       fadeInfo("⚠️ Gigi sudah rusak parah — struktur gigi rusak, infeksi mencapai ujung akar. Perawatan terakhir: saluran akar atau pencabutan. Tidak bisa diperbaiki di aplikasi ini.");
       createResetButton();
@@ -236,6 +202,7 @@
   // expose for debugging
   window.kariesUI = {
     _getState: () => ({ cleanValue, healthValue, sweetCount, healthyCount }),
+    // kept for compatibility (will request animations)
     setActionRequest: (a) => { window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action: a } })); },
     updateBars, fadeInfo, setButtonsEnabled, createResetButton, removeResetButton
   };

@@ -1,4 +1,8 @@
-/* ui.css (updated) */
+/* ui.css (updated positions)
+   - #bars moved down a bit
+   - #buttons + infoText moved up from bottom
+*/
+
 body {
   margin: 0;
   overflow: hidden;
@@ -6,10 +10,10 @@ body {
   background: #000;
 }
 
-/* canvas full */
+/* canvas penuh */
 canvas { display:block; width:100vw; height:100vh; position: absolute; }
 
-/* UI overlay */
+/* UI Overlay */
 #ui {
   position: absolute;
   top: 0;
@@ -23,10 +27,11 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   pointer-events: none;
 }
 
-/* STATUS BARS */
+/* STATUS BARS
+   ===== moved DOWN a bit: top increased from 18px -> 60px ===== */
 #bars {
   position: absolute;
-  top: 60px; /* lowered a bit */
+  top: 60px; /* <- diturunkan sedikit */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -54,19 +59,21 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .bar-fill { flex:1; height:26px; border-radius:10px; background:#555; overflow:hidden; position:relative; }
 .bar-inner { height:100%; width:100%; border-radius:10px; transition: width 0.3s ease; }
 
+/* warna */
 .clean .bar-inner { background: linear-gradient(to right, #4fc3f7, #0288d1); }
 .health .bar-inner { background: linear-gradient(to right, #ef9a9a, #e57373); }
 .bar-inner.damage { animation: blinkRed 0.4s ease; }
 @keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
 
-/* Buttons container (moved up) */
+/* Buttons container
+   ===== moved UP a bit: increase margin-bottom so container sits higher ===== */
 #buttons {
   width: 100%;
   max-width: 420px;
   display: flex;
   gap: 20px;
   justify-content: center;
-  margin-bottom: 96px; /* raise buttons from bottom */
+  margin-bottom: 96px; /* <- naikkan agar tombol bergerak ke atas (default sebelumnya ~25px) */
   pointer-events: auto;
   z-index: 45;
 }
@@ -81,16 +88,17 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 }
 .action-btn span { font-size:13px; font-weight:600; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,0.4); }
 
+/* background color circles */
 .action-btn.brush img { background:#b2e8ff; }
 .action-btn.healthy img { background:#c8f7c2; }
 .action-btn.sweet img { background:#ffd4e1; }
 
-/* info text (above buttons) */
+/* info text (di atas tombol) */
 #infoText {
   background: rgba(255,255,255,0.95);
   border-radius: 15px;
   padding: 8px 14px;
-  margin-bottom: 14px;
+  margin-bottom: 14px; /* sedikit lebih besar agar ada ruang antara info & tombol */
   font-size:13px;
   font-weight:500;
   color: #0b4f8a;
@@ -102,7 +110,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   z-index: 46;
 }
 
-/* XR button - centered top */
+/* XR button - CENTERED top */
 .xr-btn {
   position: absolute;
   top: 18px;
@@ -119,42 +127,15 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   box-shadow: 0 6px 18px rgba(11,102,255,0.25);
   transition: opacity 0.28s ease, transform 0.18s ease;
 }
-.xr-btn.hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) scale(0.96); }
 
-/* EXTRA BUTTONS container (directly under #buttons) */
-#extraButtons {
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  margin-bottom: 36px; /* space under buttons */
-  pointer-events: auto;
-  z-index: 48;
-  opacity: 1;
+/* hidden state (fade out & disable) */
+.xr-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.96);
 }
 
-/* Reset button (styled to match look) */
+/* reset button style (if UI creates it) */
 #resetBtn {
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  color: #fff;
-  background: linear-gradient(180deg,#5bb0ff,#2177ff);
-}
-
-/* optional Exit button style if you add it later */
-#exitBtn {
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  color: #fff;
-  background: linear-gradient(180deg,#ff6b6b,#d74242);
+  transition: opacity 0.2s ease;
 }
