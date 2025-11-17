@@ -1,4 +1,4 @@
-/* ui.js - clean UI wiring (extra buttons visible only in AR) - FIXED sweet logic (cleaned & deterministic) */
+/* ui.js - clean UI wiring (extra buttons visible only in AR) - FIXED: sweet reduces clean relatively */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -6,7 +6,6 @@
   const buttons = Array.from(document.querySelectorAll('.action-btn'));
   const xrBtn = document.getElementById('xrBtn');
 
-  // NEW: references to extra buttons container + buttons
   const extraButtons = document.getElementById('extraButtons');
   const resetBtn = document.getElementById('resetBtn');
   const exitBtn = document.getElementById('exitBtn');
@@ -15,12 +14,10 @@
   let cleanValue = 100;
   let healthValue = 100;
 
-  // counters for repeated actions
-  // toothStage: 0..8 (counts sweet presses / stages)
+  // toothStage for messages (0..8), counts number of sweet presses since last brush/reset
   let toothStage = 0;
   let healthyCount = 0;
 
-  // initially action buttons disabled until model placed
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
       b.style.opacity = enabled ? '1' : '0.55';
@@ -31,7 +28,6 @@
   }
   setButtonsEnabled(false);
 
-  // UI helpers
   function clamp100(v) { return Math.max(0, Math.min(100, Math.round(v * 100) / 100)); }
   function updateBars() {
     if (cleanFill) cleanFill.style.width = clamp100(cleanValue) + "%";
@@ -46,16 +42,13 @@
     }, 160);
   }
 
-  // show/hide extra buttons (called on xr-started/xr-ended)
   function setExtraButtonsVisible(visible) {
     if (!extraButtons) return;
     if (visible) extraButtons.classList.add('visible');
     else extraButtons.classList.remove('visible');
   }
-  // ensure hidden by default
   setExtraButtonsVisible(false);
 
-  // handle clicks -> request animation in index.js
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
@@ -69,15 +62,12 @@
     });
   });
 
-  // Reset button -> dispatch reset & update UI state
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('reset'));
       resetUIState();
     });
   }
-
-  // Exit AR button -> request exit; index.js will handle ending session
   if (exitBtn) {
     exitBtn.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('request-exit-ar'));
@@ -85,7 +75,6 @@
     });
   }
 
-  // when an interactor animation finished, index.js dispatches this event
   window.addEventListener('interactor-finished', (e) => {
     const d = e.detail || {};
     const action = d.action;
@@ -104,7 +93,7 @@
     if (cleanValue <= 0 && healthValue <= 0) {
       setButtonsEnabled(false);
       if (typeof toothStage === 'number' && toothStage >= 8) {
-        // keep the final sweet message visible
+        // keep final sweet message visible
       } else {
         fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
       }
@@ -114,7 +103,6 @@
     }
   });
 
-  // enable buttons when model placed
   window.addEventListener('model-placed', () => {
     toothReady = true;
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
@@ -143,32 +131,37 @@
     updateBars();
   });
 
-  // ---------- GAME LOGIC ----------
+  // ---------- GAME LOGIC (fixed) ----------
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
+        // brush increases clean by 25 (relative) and health by 25; also clears accumulated sweetStage
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
-        toothStage = 0; // brushing clears accumulated sweet stages
+        toothStage = 0; // clear accumulated sweet presses
         healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
 
       case 'sweet':
+        // if already at terminal sweet stage, keep final message
         if (toothStage >= 8) {
-          // already terminal by sweet presses
           fadeInfo("⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!");
           return;
         }
 
-        // increment stage (1..8)
+        // increment stage for messaging
         toothStage = Math.min(8, toothStage + 1);
 
-        // deterministic values derived from toothStage:
-        cleanValue = clamp100(100 - toothStage * 12.5);
-        healthValue = clamp100(100 - Math.floor(toothStage / 2) * 25);
+        // IMPORTANT: reduce cleanValue RELATIVE to current value
+        cleanValue = clamp100(cleanValue - 12.5);
 
-        // show messages per stage; final stage triggers terminal
+        // every 2 presses (when toothStage is even) reduce health by 25
+        if (toothStage % 2 === 0) {
+          healthValue = clamp100(healthValue - 25);
+        }
+
+        // show per-stage message; stage 8 enforces terminal
         switch (toothStage) {
           case 1:
             fadeInfo("🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!");
