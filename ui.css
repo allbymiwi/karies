@@ -1,4 +1,8 @@
-/* ui.css */
+/* ui.css (updated positions)
+   - #bars moved down a bit
+   - #buttons + infoText moved up from bottom
+*/
+
 body {
   margin: 0;
   overflow: hidden;
@@ -23,16 +27,19 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   pointer-events: none;
 }
 
-/* STATUS BARS */
+/* STATUS BARS
+   ===== moved DOWN a bit: top increased from 18px -> 60px ===== */
 #bars {
   position: absolute;
-  top: 25px;
+  top: 60px; /* <- diturunkan sedikit */
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: auto;
+  gap: 12px;
   align-items: center;
   pointer-events: none;
+  z-index: 50;
 }
 
 .status-bar {
@@ -58,15 +65,17 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .bar-inner.damage { animation: blinkRed 0.4s ease; }
 @keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
 
-/* Buttons container */
+/* Buttons container
+   ===== moved UP a bit: increase margin-bottom so container sits higher ===== */
 #buttons {
   width: 100%;
   max-width: 420px;
   display: flex;
   gap: 20px;
   justify-content: center;
-  margin-bottom: 25px;
+  margin-bottom: 96px; /* <- naikkan agar tombol bergerak ke atas (default sebelumnya ~25px) */
   pointer-events: auto;
+  z-index: 45;
 }
 
 .action-btn {
@@ -84,12 +93,12 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .action-btn.healthy img { background:#c8f7c2; }
 .action-btn.sweet img { background:#ffd4e1; }
 
-/* info text */
+/* info text (di atas tombol) */
 #infoText {
   background: rgba(255,255,255,0.95);
   border-radius: 15px;
   padding: 8px 14px;
-  margin-bottom: 12px;
+  margin-bottom: 14px; /* sedikit lebih besar agar ada ruang antara info & tombol */
   font-size:13px;
   font-weight:500;
   color: #0b4f8a;
@@ -98,6 +107,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   max-width:380px;
   pointer-events:auto;
   transition: opacity 0.3s ease;
+  z-index: 46;
 }
 
 /* XR button - CENTERED top */
