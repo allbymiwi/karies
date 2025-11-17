@@ -258,7 +258,7 @@ async function runInteractorAnimation(action) {
     // upright & slightly higher on Y so brush orbits the top of the tooth
     localStart.set(0.0, 0.40, 0.12); // x,y,z : center above crown
     localRot.set(0, 0, 0);           // no tilt - upright
-    localScale.set(0.45,0.45,0.45);
+    localScale.set(0.55,0.55,0.55);
   } else if (action === 'healthy') {
     localStart.set(0.0, 1.6, 0.9);
     localRot.set(-0.25, 0, -0.5);
@@ -729,4 +729,5 @@ function render(time, frame) {
 
 // initialize
 initThree();
+
 
