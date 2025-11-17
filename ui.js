@@ -1,4 +1,4 @@
-/* ui.js - updated: sweet action now has 8-stage terminal messages */
+/* ui.js - fix: deterministic sweet logic (every 2 presses -> health -25) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -6,7 +6,8 @@
   const buttons = Array.from(document.querySelectorAll('.action-btn'));
   const xrBtn = document.getElementById('xrBtn');
 
-  // NEW extra buttons
+  // NEW: references to extra buttons container + buttons
+  const extraButtons = document.getElementById('extraButtons');
   const resetBtn = document.getElementById('resetBtn');
   const exitBtn = document.getElementById('exitBtn');
 
@@ -14,11 +15,12 @@
   let cleanValue = 100;
   let healthValue = 100;
 
-  // NEW: sweetStage tracks 0..8 presses for "makanan manis"
-  let sweetStage = 0;
+  // counters for repeated actions
+  // sweetPressCount: 0..8 (one increment per sweet press)
+  let sweetPressCount = 0;
   let healthyCount = 0;
 
-  // initially buttons disabled until model placed
+  // initially action buttons disabled until model placed
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
       b.style.opacity = enabled ? '1' : '0.55';
@@ -26,17 +28,7 @@
       b.tabIndex = enabled ? 0 : -1;
       if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
     });
-    // extra buttons (reset/exit) remain interactive even when action buttons are disabled
-    if (resetBtn) {
-      resetBtn.style.opacity = '1';
-      resetBtn.style.pointerEvents = 'auto';
-      resetBtn.tabIndex = 0;
-    }
-    if (exitBtn) {
-      exitBtn.style.opacity = '1';
-      exitBtn.style.pointerEvents = 'auto';
-      exitBtn.tabIndex = 0;
-    }
+    // DO NOT force extraButtons here — visibility is controlled by xr-started/xr-ended
   }
   setButtonsEnabled(false);
 
@@ -54,6 +46,15 @@
       info.style.opacity = 1;
     }, 160);
   }
+
+  // show/hide extra buttons (called on xr-started/xr-ended)
+  function setExtraButtonsVisible(visible) {
+    if (!extraButtons) return;
+    if (visible) extraButtons.classList.add('visible');
+    else extraButtons.classList.remove('visible');
+  }
+  // ensure hidden by default
+  setExtraButtonsVisible(false);
 
   // handle clicks -> request animation in index.js
   buttons.forEach(btn => {
@@ -110,11 +111,15 @@
     updateBars();
     window.dispatchEvent(new CustomEvent('health-changed', { detail: { health: healthValue, clean: cleanValue } }));
 
-    // check terminal condition
+    // check terminal condition: only show generic terminal message if NOT final sweet message
     if (cleanValue <= 0 && healthValue <= 0) {
       setButtonsEnabled(false);
-      fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
-      // emit terminal reached for other listeners
+      if (sweetPressCount >= 8) {
+        // final sweet-stage message already shown in performActionEffect; keep it visible
+      } else {
+        fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
+      }
+      // emit terminal reached for other systems
       window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_and_clean_zero' } }));
     } else {
       setButtonsEnabled(true);
@@ -129,15 +134,19 @@
     updateBars();
   });
 
-  // when XR started: hide Enter AR button
+  // when XR started: hide Enter AR button + show extra buttons
   window.addEventListener('xr-started', () => {
     if (xrBtn) xrBtn.classList.add('hidden');
+    // show reset/exit now AR active
+    setExtraButtonsVisible(true);
     fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
   });
 
-  // when XR ended: show Enter AR again and lock UI
+  // when XR ended: show Enter AR again, hide extra buttons, and lock UI
   window.addEventListener('xr-ended', () => {
     if (xrBtn) xrBtn.classList.remove('hidden');
+    // hide reset/exit after AR ends
+    setExtraButtonsVisible(false);
     toothReady = false;
     setButtonsEnabled(false);
     fadeInfo("AR berhenti. Arahkan kamera ke lantai dan tekan Enter AR.");
@@ -151,8 +160,7 @@
     updateBars();
   });
 
-  // ------------ GAME LOGIC / ACTION EFFECTS ---------------
-  // Sweet-stage messages (1..8)
+  // ---------- SWEET STAGE MESSAGES (1..8) ----------
   const SWEET_MESSAGES = {
     1: "🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!",
     2: "🍬 Plak Gigi (Tetap Diingatkan) — Plaknya makin banyak nih… ayo jangan sering makan permen!",
@@ -170,38 +178,43 @@
       case 'brush':
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
-        sweetStage = 0; healthyCount = 0;
+        // brushing clears accumulated sweet presses (plak dihapus)
+        sweetPressCount = 0;
+        healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
-      case 'sweet':
-        // Each sweet press is one stage out of 8. Each press reduces clean by 12.5 (100/8).
-        if (sweetStage < 8) sweetStage++;
-        cleanValue = clamp100(cleanValue - (100 / 8));
 
-        // Show the corresponding stage message
-        const msg = SWEET_MESSAGES[sweetStage] || "🍭 Gula menempel — kebersihan turun.";
+      case 'sweet':
+        // guard: if already at final stage, ignore further sweet inputs
+        if (sweetPressCount >= 8) {
+          fadeInfo(SWEET_MESSAGES[8]);
+          return;
+        }
+
+        // increment press count (1..8) and reduce cleanliness each press by 12.5
+        sweetPressCount++;
+        cleanValue = clamp100(cleanValue - 12.5);
+
+        // if we've reached an even press (2,4,6,8) -> reduce health by 25
+        if (sweetPressCount % 2 === 0) {
+          // reduce health by 25 (4 lives total)
+          healthValue = clamp100(healthValue - 25);
+        }
+
+        // show the corresponding stage message (keeps final stage visible)
+        const msg = SWEET_MESSAGES[sweetPressCount] || "🍭 Gula menempel — kebersihan turun.";
         fadeInfo(msg);
 
-        // If reached final stage (8), force terminal: set both bars 0 and disable actions
-        if (sweetStage >= 8) {
+        // if final stage reached, enforce terminal state: set both bars to 0 and disable actions
+        if (sweetPressCount >= 8) {
           cleanValue = 0;
           healthValue = 0;
-          // inform other systems: health-changed + terminal
-          // updateBars() + dispatch happen after this function returns in interactor-finished handler
           setButtonsEnabled(false);
-          // also dispatch a terminal-reached event for index.js or other listeners
+          // dispatch terminal-reached so index.js & other systems can react
           window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'karies_parah_stage8' } }));
-        } else {
-          // optionally, keep previous mechanic of health drop after some repeats:
-          // here we'll optionally penalize health at stage 4 and stage 6 as extra realism
-          if (sweetStage === 4) {
-            healthValue = clamp100(healthValue - 12.5);
-            // small extra message appended
-            // note: fadeInfo already showed main message; we briefly update after
-            setTimeout(() => fadeInfo(SWEET_MESSAGES[sweetStage] + " (Asam mulai mengganggu kesehatan gigi.)"), 900);
-          }
         }
         break;
+
       case 'healthy':
         cleanValue = clamp100(cleanValue + 12.5);
         healthyCount++;
@@ -213,6 +226,7 @@
           fadeInfo("🥗 Makanan sehat menambah kebersihan sedikit.");
         }
         break;
+
       default:
         console.warn('Unknown action', action);
     }
@@ -222,7 +236,7 @@
   function resetUIState() {
     cleanValue = 100;
     healthValue = 100;
-    sweetStage = 0;
+    sweetPressCount = 0;
     healthyCount = 0;
     toothReady = false;
     setButtonsEnabled(false);
@@ -235,7 +249,7 @@
     setButtonsEnabled,
     updateBars,
     fadeInfo,
-    _getState: () => ({ cleanValue, healthValue, sweetStage, healthyCount })
+    _getState: () => ({ cleanValue, healthValue, sweetPressCount, healthyCount })
   };
 
   // initial UI
