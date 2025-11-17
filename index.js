@@ -1,4 +1,4 @@
-// index.js (module) - AR logic (orbit brush, preloading, swap, expose endXRSession, xr-started/xr-ended)
+// index.js (ORBIT-ONLY brush) - full file
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -42,13 +42,9 @@ const _scale = new THREE.Vector3();
 
 const xrBtn = document.getElementById('xrBtn');
 
-// expose endXRSession to global so ui.js can call it
-window.endXRSession = endXRSession; // will be hoisted; function defined later but safe assignment here
-
 // lighting global
 let spotLight = null;
 
-// wire xr button
 xrBtn.addEventListener('click', () => {
   if (!xrSession) requestXRSession();
   else endXRSession();
@@ -157,11 +153,6 @@ function initThree() {
     currentHealthModelKey = DEFAULT_HEALTH_KEY;
   });
 
-  // listen for request-xr-end (fallback) so ui.js can request end without direct function call
-  window.addEventListener('request-xr-end', () => {
-    endXRSession();
-  });
-
   console.log('index.js loaded. Ready.');
 }
 
@@ -194,6 +185,7 @@ function applyMeshMaterialTweaks(model) {
 }
 
 // ---- PRELOAD ALL MODELS (tooth + interactors) ----
+// store both scene and animations (so we can play baked GLB clips)
 function preloadAllModelsAndInteractors() {
   const files = new Set(Object.values(MODEL_MAP).concat(Object.values(INTERACTORS)));
   const promises = [];
@@ -356,9 +348,9 @@ function animateBrushUpright(wrapper) {
     const initialScale = wrapper.scale.x;
 
     // CONFIG: orbit parameters tuned for top brushing
-    const radius = 0.10;       // small radius so brush covers crown area
-    const revolutions = 2;     // two gentle rotations
-    const orbitDuration = 900; // ms
+    const radius = 0.50;       // small radius so brush covers crown area
+    const revolutions = 3;     // two gentle rotations
+    const orbitDuration = 1200; // ms
     const approachDur = 100;
     const retreatDur = 100;
     const totalOrbitTime = orbitDuration;
@@ -617,13 +609,6 @@ async function requestXRSession() {
 async function onSessionStarted(session) {
   xrSession = session;
   xrBtn.textContent = 'STOP AR';
-
-  // notify UI that XR started (ui.js listens for this to show extraButtons)
-  window.dispatchEvent(new CustomEvent('xr-started'));
-
-  // HIDE (fade) the Enter AR button when AR starts
-  xrBtn.classList.add('hidden');
-
   try {
     await gl.makeXRCompatible();
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
@@ -639,15 +624,8 @@ async function onSessionStarted(session) {
 }
 
 function onSessionEnded() {
-  // notify UI
-  window.dispatchEvent(new CustomEvent('xr-ended'));
-
   xrSession = null;
   xrBtn.textContent = 'Enter AR';
-
-  // SHOW (fade in) the Enter AR button when AR ends
-  xrBtn.classList.remove('hidden');
-
   hitTestSourceRequested = false;
   hitTestSource = null;
   renderer.setAnimationLoop(null);
@@ -657,7 +635,6 @@ function endXRSession() {
   if (!xrSession) return;
   xrSession.end().catch(err => console.warn('end XR failed', err));
 }
-window.endXRSession = endXRSession; // ensure exposed (again) after declaration
 
 function onSelect() {
   if (!reticle.visible || objectPlaced) {
