@@ -1,4 +1,5 @@
-/* ui.js - clean UI wiring (extra buttons visible only in AR) - FIXED: sweet reduces clean relatively */
+/* ui.js - adjusted: apply health drop BEFORE cleanliness when sweet press completes an even stage,
+   and brush no longer resets toothStage (so pairs persist) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -14,7 +15,7 @@
   let cleanValue = 100;
   let healthValue = 100;
 
-  // toothStage for messages (0..8), counts number of sweet presses since last brush/reset
+  // toothStage counts sweet presses since last RESET (0..8). Brush no longer resets this.
   let toothStage = 0;
   let healthyCount = 0;
 
@@ -131,37 +132,38 @@
     updateBars();
   });
 
-  // ---------- GAME LOGIC (fixed) ----------
+  // ---------- GAME LOGIC (new order + persistent toothStage) ----------
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
-        // brush increases clean by 25 (relative) and health by 25; also clears accumulated sweetStage
+        // Brush increases clean & health but NO LONGER resets toothStage.
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
-        toothStage = 0; // clear accumulated sweet presses
         healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
 
       case 'sweet':
-        // if already at terminal sweet stage, keep final message
         if (toothStage >= 8) {
           fadeInfo("⚠️ Karies Gigi Parah – Harus Reset — Giginya sudah bolong besar dan nggak bisa diselamatkan... harus mulai ulang ya!");
           return;
         }
 
-        // increment stage for messaging
-        toothStage = Math.min(8, toothStage + 1);
+        // compute next stage but don't overwrite toothStage until after we apply health logic
+        const nextStage = Math.min(8, toothStage + 1);
 
-        // IMPORTANT: reduce cleanValue RELATIVE to current value
-        cleanValue = clamp100(cleanValue - 12.5);
-
-        // every 2 presses (when toothStage is even) reduce health by 25
-        if (toothStage % 2 === 0) {
+        // If the press makes stage even (=> health should drop), apply health drop FIRST
+        if (nextStage % 2 === 0) {
+          // reduce health by 25 (once per pair)
           healthValue = clamp100(healthValue - 25);
         }
 
-        // show per-stage message; stage 8 enforces terminal
+        // Now reduce cleanliness relatively
+        cleanValue = clamp100(cleanValue - 12.5);
+
+        // finally commit stage and show message
+        toothStage = nextStage;
+
         switch (toothStage) {
           case 1:
             fadeInfo("🍬 Peringatan Plak Gigi — Gulanya nempel di gigi dan mulai bikin plak, hati-hati ya!");
@@ -215,7 +217,7 @@
   function resetUIState() {
     cleanValue = 100;
     healthValue = 100;
-    toothStage = 0;
+    toothStage = 0; // reset stage on explicit Reset
     healthyCount = 0;
     toothReady = false;
     setButtonsEnabled(false);
