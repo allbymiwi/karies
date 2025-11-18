@@ -791,10 +791,9 @@ async function onSessionStarted(session) {
 
 function onSessionEnded() {
   xrSession = null;
-  xrBtn.textContent = 'Enter AR';
-
-  // SHOW (fade in) the Enter AR button when AR ends
-  xrBtn.classList.remove('hidden');
+  // HAPUS: jangan set text atau show tombol Enter AR
+  // xrBtn.textContent = 'Enter AR';
+  // xrBtn.classList.remove('hidden');
 
   // INFORM UI that XR ended
   window.dispatchEvent(new CustomEvent('xr-ended'));

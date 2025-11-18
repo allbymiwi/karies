@@ -325,11 +325,10 @@
     // note: action buttons still controlled by model-placed (so they remain disabled until model is placed)
   });
 
-  // when XR ended: show Enter AR again and hide AR-only controls
+  // when XR ended: langsung kembali ke splash screen tanpa show tombol Enter AR
   window.addEventListener('xr-ended', () => {
     toothReady = false;
     setButtonsEnabled(false);
-    fadeInfo("AR berhenti.");
 
     // hide AR-only controls and AR UI elements
     showARControls(false);
@@ -337,7 +336,7 @@
     // NEW: Reset tooth status when AR ends
     updateToothStatus(null);
     
-    // NEW: Show splash screen when XR session ends
+    // NEW: Langsung show splash screen tanpa menampilkan tombol Enter AR
     showSplashScreen();
   });
 
