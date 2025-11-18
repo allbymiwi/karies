@@ -132,34 +132,43 @@
     popupOdontogramText.textContent = description;
   }
 
+  // NEW: Function to show popup
+  function showOdontogramPopup() {
+    if (!inXR) {
+      fadeInfo("Fitur ini hanya tersedia saat berada di AR.");
+      return;
+    }
+    
+    // Update popup content based on current health
+    const healthKey = getHealthKeyFromValue(healthValue);
+    updatePopupOdontogram(healthKey);
+    
+    // Show popup and add class to body to block background interactions
+    odontogramPopup.classList.remove('hidden');
+    document.body.classList.add('popup-active');
+  }
+
+  // NEW: Function to hide popup
+  function hideOdontogramPopup() {
+    odontogramPopup.classList.add('hidden');
+    document.body.classList.remove('popup-active');
+  }
+
   // NEW: Odontogram button click handler
   if (odontogramBtn) {
-    odontogramBtn.addEventListener('click', () => {
-      if (!inXR) {
-        fadeInfo("Fitur ini hanya tersedia saat berada di AR.");
-        return;
-      }
-      
-      // Update popup content based on current health
-      const healthKey = getHealthKeyFromValue(healthValue);
-      updatePopupOdontogram(healthKey);
-      
-      odontogramPopup.classList.remove('hidden');
-    });
+    odontogramBtn.addEventListener('click', showOdontogramPopup);
   }
 
-  // NEW: Close popup handler
+  // NEW: Close popup handler - FIXED
   if (closePopup) {
-    closePopup.addEventListener('click', () => {
-      odontogramPopup.classList.add('hidden');
-    });
+    closePopup.addEventListener('click', hideOdontogramPopup);
   }
 
-  // Close popup when clicking outside content
+  // Close popup when clicking outside content - FIXED
   if (odontogramPopup) {
     odontogramPopup.addEventListener('click', (e) => {
       if (e.target === odontogramPopup) {
-        odontogramPopup.classList.add('hidden');
+        hideOdontogramPopup();
       }
     });
   }

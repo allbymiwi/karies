@@ -300,17 +300,19 @@ canvas {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  pointer-events: auto;
 }
 
 .popup-content {
   background: white;
   padding: 30px;
   border-radius: 20px;
-  max-width: 400px;
+  max-width: 500px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
+  pointer-events: auto;
 }
 
 .close-btn {
@@ -319,16 +321,18 @@ canvas {
   right: 20px;
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
   color: #666;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   transition: background-color 0.2s ease;
+  z-index: 1001;
+  pointer-events: auto;
 }
 
 .close-btn:hover {
@@ -340,6 +344,7 @@ canvas {
   color: #333;
   text-align: center;
   margin-bottom: 20px;
+  font-size: 20px;
 }
 
 .odontogram-single {
@@ -348,10 +353,10 @@ canvas {
 }
 
 .odontogram-single img {
-  width: 120px;
-  height: 120px;
+  width: 360px; /* 3x lipat dari 120px */
+  height: 360px; /* 3x lipat dari 120px */
   object-fit: contain;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   display: block;
   margin-left: auto;
   margin-right: auto;
@@ -359,10 +364,13 @@ canvas {
 
 .odontogram-single p {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   color: #333;
   font-weight: 500;
   line-height: 1.4;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 10px;
 }
 
 /* show AR-only controls */
@@ -375,4 +383,10 @@ canvas {
 
 .hidden {
   display: none !important;
+}
+
+/* Class untuk memblokir interaksi dengan elemen di belakang popup */
+.popup-active #ui > *:not(#odontogramPopup) {
+  pointer-events: none !important;
+  opacity: 0.7;
 }
