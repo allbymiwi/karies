@@ -1,4 +1,6 @@
-/* ui.js - clean UI wiring (controls visible only in AR) */
+// ui.js — MERGED final (PART 1/3)
+// Paste the three parts in order to reconstruct the full file.
+
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -17,6 +19,12 @@
   // containers (to toggle visibility)
   const extraButtonsContainer = document.getElementById('extraButtons');
   const scaleButtonsContainer = document.getElementById('scaleButtons');
+
+  // NEW helper UI elements (small icon + label)
+  // If these are not present in DOM they will be created defensively later.
+  let helperBar = document.getElementById('helperBar');
+  let helperIcon = document.getElementById('helperIcon');
+  let helperLabel = document.getElementById('helperLabel');
 
   let toothReady = false;
   let cleanValue = 100;
@@ -96,6 +104,82 @@
     }, 160);
   }
 
+  // -----------------------
+  // NEW: Helper bar logic
+  // -----------------------
+
+  // mapping model filenames -> label + icon (odontogram folder)
+  const MODEL_HELPER_MAP = {
+    'gigisehat.glb':            { text: 'gigi sehat',           icon: 'odontogram/odontogram_normal.png' },
+    'gigiplak.glb':             { text: 'gigi plak',            icon: 'odontogram/odontogram_normal.png' },
+    'gigiasam.glb':             { text: 'gigi asam',            icon: 'odontogram/odontogram_karang.png' },
+    'gigidemineralisasi.glb':   { text: 'gigi demineralisasi',  icon: 'odontogram/odontogram_karang.png' },
+    'gigikaries.glb':           { text: 'gigi karies',          icon: 'odontogram/odontogram_karies.png' }
+  };
+  const NO_TOOTH = { text: 'gigi tidak ada', icon: 'odontogram/odontogram_hilang.png' };
+
+  // Defensive helper: ensure DOM helper block exists; create if missing
+  function ensureHelperElements() {
+    helperBar = document.getElementById('helperBar');
+    helperIcon = document.getElementById('helperIcon');
+    helperLabel = document.getElementById('helperLabel');
+    if (helperBar && helperIcon && helperLabel) return;
+
+    const bars = document.getElementById('bars');
+    if (!bars) return; // can't create if parent not present
+
+    const div = document.createElement('div');
+    div.className = 'status-bar helper';
+    div.id = 'helperBar';
+    div.setAttribute('aria-live', 'polite');
+    div.setAttribute('aria-atomic', 'true');
+
+    const img = document.createElement('img');
+    img.id = 'helperIcon';
+    img.className = 'helper-icon';
+    img.src = NO_TOOTH.icon;
+    img.alt = NO_TOOTH.text;
+
+    const span = document.createElement('span');
+    span.id = 'helperLabel';
+    span.className = 'helper-label';
+    span.textContent = NO_TOOTH.text;
+
+    div.appendChild(img);
+    div.appendChild(span);
+    bars.appendChild(div);
+
+    // reassign references
+    helperBar = document.getElementById('helperBar');
+    helperIcon = document.getElementById('helperIcon');
+    helperLabel = document.getElementById('helperLabel');
+  }
+
+  // set helper by model filename or null -> NO_TOOTH
+  function setHelperByModelFile(modelFile) {
+    ensureHelperElements();
+    if (!helperIcon || !helperLabel) return;
+
+    let entry = NO_TOOTH;
+    if (modelFile && typeof modelFile === 'string') {
+      const name = modelFile.split('/').pop();
+      if (MODEL_HELPER_MAP[name]) entry = MODEL_HELPER_MAP[name];
+    }
+
+    helperLabel.textContent = entry.text;
+    helperIcon.setAttribute('src', entry.icon);
+    helperIcon.setAttribute('alt', entry.text);
+  }
+
+  // initial helper state
+  setHelperByModelFile(null);
+
+  // -----------------------
+  // end helper init
+  // -----------------------
+// ui.js — MERGED final (PART 2/3)
+// Continue pasting after Part 1/3
+
   // handle clicks -> request animation in index.js
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -138,6 +222,10 @@
       if (!inXR) { fadeInfo("Fitur ini hanya tersedia saat berada di AR."); return; }
       // inform AR system to reset scene
       window.dispatchEvent(new CustomEvent('reset'));
+
+      // NEW — also reset helper bar to "gigi tidak ada"
+      setHelperByModelFile(null);
+
       // reset local UI values & lock actions until model placed again
       resetUIState();
     });
@@ -168,8 +256,6 @@
     }
 
     // Dispatch last action so index.js knows which button triggered this animation
-    // (Important: we dispatch BEFORE performActionEffect so index.js can choose message
-    //  based on both lastAction and the updated health.)
     window.dispatchEvent(new CustomEvent('ui-last-action', { detail: { action } }));
 
     // After a successful animation, UI logic updates local state and tells index.js to swap model
@@ -183,18 +269,24 @@
     if (cleanValue <= 0 && healthValue <= 0) {
       setButtonsEnabled(false);
       fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
-      // keep Enter AR handled by xr-ended when session ends
     } else {
       setButtonsEnabled(true);
     }
   });
 
   // enable buttons when model placed
-  window.addEventListener('model-placed', () => {
+  window.addEventListener('model-placed', (e) => {
     toothReady = true;
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
     setButtonsEnabled(true);
     updateBars();
+
+    // NEW — sync helper bar when model is placed
+    try {
+      const detail = e.detail || {};
+      const file = detail.modelFile || (detail.userData && detail.userData.modelFile) || null;
+      setHelperByModelFile(file);
+    } catch (_) {}
   });
 
   // when XR started: hide Enter AR button and show AR-only controls
@@ -202,10 +294,7 @@
     if (xrBtn) xrBtn.classList.add('hidden');
     fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
 
-    // show AR controls (scale + extra)
     showARControls(true);
-
-    // note: action buttons still controlled by model-placed (so they remain disabled until model is placed)
   });
 
   // when XR ended: show Enter AR again and hide AR-only controls
@@ -215,8 +304,10 @@
     setButtonsEnabled(false);
     fadeInfo("AR berhenti. Arahkan kamera ke lantai dan tekan Enter AR.");
 
-    // hide AR-only controls
     showARControls(false);
+
+    // NEW — reset helper bar too
+    setHelperByModelFile(null);
   });
 
   // local state changes (if some other part dispatches health-changed directly)
@@ -225,7 +316,47 @@
     if (typeof d.clean === 'number') cleanValue = d.clean;
     if (typeof d.health === 'number') healthValue = d.health;
     updateBars();
+
+    // NEW: Translate health numeric → model file and update helper bar
+    try {
+      const h = healthValue;
+      let key;
+      if      (h >= 100) key = 100;
+      else if (h >= 75)  key = 75;
+      else if (h >= 50)  key = 50;
+      else if (h >= 25)  key = 25;
+      else               key = 0;
+
+      const keyToFile = {
+        100: "gigisehat.glb",
+        75:  "gigiplak.glb",
+        50:  "gigiasam.glb",
+        25:  "gigidemineralisasi.glb",
+        0:   "gigikaries.glb"
+      };
+
+      setHelperByModelFile(keyToFile[key]);
+    } catch (_) {}
   });
+
+  // fallback event sometimes used by index.js
+  window.addEventListener('health-stage-info', (e) => {
+    try {
+      const d = e.detail || {};
+      if (typeof d.key === 'number') {
+        const keyToFile = {
+          100: "gigisehat.glb",
+          75:  "gigiplak.glb",
+          50:  "gigiasam.glb",
+          25:  "gigidemineralisasi.glb",
+          0:   "gigikaries.glb"
+        };
+        setHelperByModelFile(keyToFile[d.key]);
+      }
+    } catch (_) {}
+  });
+// ui.js — MERGED final (PART 3/3)
+// Continue pasting after Part 2/3
 
   // apply the "game logic" to UI values AFTER animations finish (called by interactor-finished)
   function performActionEffect(action) {
@@ -233,9 +364,11 @@
       case 'brush':
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
-        sweetCount = 0; healthyCount = 0;
+        sweetCount = 0; 
+        healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
+
       case 'sweet':
         cleanValue = clamp100(cleanValue - 12.5);
         sweetCount++;
@@ -247,6 +380,7 @@
           fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
+
       case 'healthy':
         cleanValue = clamp100(cleanValue + 12.5);
         healthyCount++;
@@ -258,6 +392,7 @@
           fadeInfo("🥗 Makanan sehat menambah kebersihan sedikit.");
         }
         break;
+
       default:
         console.warn('Unknown action', action);
     }
@@ -273,6 +408,9 @@
     setButtonsEnabled(false);
     updateBars();
     fadeInfo("Model direset, silakan place ulang.");
+
+    // ALSO reset helper bar
+    setHelperByModelFile(null);
   }
 
   // expose for debugging
@@ -285,6 +423,8 @@
 
   // initial UI
   updateBars();
+
   // ensure AR controls hidden initially
   showARControls(false);
-})();
+
+})(); // end IIFE

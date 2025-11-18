@@ -1,70 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>kARies - AR Edukasi Gigi</title>
-  <link rel="stylesheet" href="./ui.css">
+  <title>Odontogram AR</title>
+  <link rel="stylesheet" href="ui.css">
 </head>
 <body>
-  <!-- XR Button (center top) -->
-  <button id="xrBtn" class="xr-btn">Enter AR</button>
+  <div id="app">
+    <header id="topbar">
+      <h1>Odontogram AR</h1>
+    </header>
 
-  <!-- AR canvas -->
-  <canvas id="canvas"></canvas>
+    <main id="main">
+      <!-- AR canvas / viewport (index.js menangani AR/Three/placement) -->
+      <div id="viewport" aria-label="Viewport AR"></div>
 
-  <!-- UI overlay -->
-  <div id="ui">
-    <div id="bars">
-      <div class="status-bar clean">
-        <img src="icons/water.png" class="status-icon" alt="Kebersihan">
-        <span class="status-label">Kebersihan</span>
-        <div class="bar-fill"><div id="cleanFill" class="bar-inner" style="width:100%"></div></div>
-      </div>
+      <!-- UI overlay: status bars, helper -->
+      <aside id="uiOverlay">
+        <div id="bars">
+          <div class="status-bar clean" role="status" aria-label="Kebersihan">
+            <img src="icons/water.png" class="status-icon" alt="Kebersihan">
+            <span class="status-label">Kebersihan</span>
+            <div class="bar-fill"><div id="cleanFill" class="bar-inner" style="width:100%"></div></div>
+          </div>
 
-      <div class="status-bar health">
-        <img src="icons/heart.png" class="status-icon" alt="Kesehatan">
-        <span class="status-label">Kesehatan</span>
-        <div class="bar-fill"><div id="healthFill" class="bar-inner" style="width:100%"></div></div>
-      </div>
-    </div>
+          <div class="status-bar health" role="status" aria-label="Kesehatan">
+            <img src="icons/heart.png" class="status-icon" alt="Kesehatan">
+            <span class="status-label">Kesehatan</span>
+            <div class="bar-fill"><div id="healthFill" class="bar-inner" style="width:100%"></div></div>
+          </div>
 
-    <div id="infoText">Tekan Enter AR. Lalu arahkan kamera ke lantai hingga muncul lingkaran hijau dan tekan lingkaran untuk memunculkan gigi!</div>
+          <!-- NEW: Helper / Message bar under the status bars -->
+          <div class="status-bar helper" id="helperBar" aria-live="polite" aria-atomic="true">
+            <img id="helperIcon" src="odontogram/odontogram_hilang.png" class="helper-icon" alt="Status Gigi">
+            <span id="helperLabel" class="helper-label">gigi tidak ada</span>
+          </div>
+        </div>
 
-    <div id="buttons">
-      <button class="action-btn brush" data-action="brush">
-        <img src="icons/sikat.png" alt="Gosok Gigi">
-        <span>Gosok Gigi</span>
-      </button>
+        <!-- Small info area (existing app may use .infoText/fadeInfo) -->
+        <div id="infoArea" aria-hidden="false">
+          <div id="infoText" class="info-text"></div>
+        </div>
 
-      <button class="action-btn healthy" data-action="healthy">
-        <img src="icons/wortel.png" alt="Makanan Sehat">
-        <span>Makanan Sehat</span>
-      </button>
+        <!-- Controls (these are examples; index.js may wire actual buttons) -->
+        <div id="controls">
+          <button id="btnPlaceModel" class="btn">Enter AR / Place</button>
+          <button id="btnReset" class="btn">Reset</button>
+        </div>
+      </aside>
+    </main>
 
-      <button class="action-btn sweet" data-action="sweet">
-        <img src="icons/permen.png" alt="Makanan Manis">
-        <span>Makanan Manis</span>
-      </button>
-    </div>
-
-    <!-- NEW: Scale Buttons - under action buttons (middle bottom) -->
-    <div id="scaleButtons">
-      <button id="scaleUpBtn" class="scale-btn">Perbesar</button>
-      <button id="scaleDownBtn" class="scale-btn">Perkecil</button>
-    </div>
-
-    <!-- NEW: extra buttons under action buttons -->
-    <div id="extraButtons">
-      <button id="resetBtn" class="extra-btn">Reset</button>
-      <button id="exitBtn" class="extra-btn">Exit AR</button>
-    </div>
+    <footer id="footer">
+      <small>© Odontogram</small>
+    </footer>
   </div>
 
-  <!-- UI logic first -->
-  <script src="./ui.js"></script>
+  <!-- Primary app logic (your existing index.js should be kept) -->
+  <script src="index.js"></script>
 
-  <!-- AR logic (module) -->
-  <script type="module" src="./index.js"></script>
+  <!-- UI wiring: helper logic + small glue -->
+  <script src="ui.js"></script>
 </body>
 </html>
