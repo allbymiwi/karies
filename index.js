@@ -76,6 +76,14 @@ function getHealthStateMessage(healthKey) {
 }
 // -------------------------------------------------------------------------
 
+// Export function untuk diakses dari ui.js
+window.requestXRSession = requestXRSession;
+
+// Tambahkan event listener untuk request AR session dari UI
+window.addEventListener('request-ar-session', () => {
+  if (!xrSession) requestXRSession();
+});
+
 xrBtn.addEventListener('click', () => {
   if (!xrSession) requestXRSession();
   else endXRSession();
