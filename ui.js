@@ -303,6 +303,8 @@
       window.dispatchEvent(new CustomEvent('reset'));
       // reset local UI values & lock actions until model placed again
       resetUIState();
+      // Set info text kembali ke awal AR
+      fadeInfo("Arahkan kamera ke lantai untuk memunculkan gigi.");
     });
   }
 
@@ -366,7 +368,7 @@
   // when XR started: hide Enter AR button and show AR-only controls
   window.addEventListener('xr-started', () => {
     // XR button sudah hidden dari awal, jadi tidak perlu diubah
-    fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
+    fadeInfo("Arahkan kamera ke lantai untuk memunculkan gigi.");
 
     // show AR controls (scale + extra) and AR UI elements
     showARControls(true);
