@@ -1,4 +1,4 @@
-/* ui.css - cleaned (no reset/extra buttons) */
+/* ui.css - cleaned (with reset/exit buttons moved to top center) */
 body {
   margin: 0;
   overflow: hidden;
@@ -26,7 +26,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 /* STATUS BARS */
 #bars {
   position: absolute;
-  top: 60px; /* lowered slightly */
+  top: 160px; /* moved lower because extraButtons moved above */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -59,14 +59,14 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .bar-inner.damage { animation: blinkRed 0.4s ease; }
 @keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
 
-/* Buttons container (raised a bit) */
+/* Buttons container */
 #buttons {
   width: 100%;
   max-width: 420px;
   display: flex;
   gap: 20px;
   justify-content: center;
-  margin-bottom: 96px; /* move up from bottom */
+  margin-bottom: 96px;
   pointer-events: auto;
   z-index: 45;
 }
@@ -85,7 +85,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .action-btn.healthy img { background:#c8f7c2; }
 .action-btn.sweet img { background:#ffd4e1; }
 
-/* info text (above buttons) */
+/* info text */
 #infoText {
   background: rgba(255,255,255,0.95);
   border-radius: 15px;
@@ -108,7 +108,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 40;
+  z-index: 70;
   padding: 8px 14px;
   border-radius: 12px;
   border: none;
@@ -120,23 +120,22 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   transition: opacity 0.28s ease, transform 0.18s ease;
 }
 
-/* hidden state (fade out & disable) */
 .xr-btn.hidden {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-50%) scale(0.96);
 }
 
-/* Extra Buttons (Reset & Exit) */
+/* Extra Buttons (Reset & Exit) – moved to top center */
 #extraButtons {
-  width: 100%;
-  max-width: 420px;
+  position: absolute;
+  top: 90px; /* below Enter AR button */
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  gap: 20px;
-  justify-content: center;
-  margin-bottom: 40px;
+  gap: 16px;
+  z-index: 65;
   pointer-events: auto;
-  z-index: 45;
 }
 
 .extra-btn {
