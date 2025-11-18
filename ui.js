@@ -103,6 +103,11 @@
       return;
     }
 
+    // Dispatch last action so index.js knows which button triggered this animation
+    // (Important: we dispatch BEFORE performActionEffect so index.js can choose message
+    //  based on both lastAction and the updated health.)
+    window.dispatchEvent(new CustomEvent('ui-last-action', { detail: { action } }));
+
     // After a successful animation, UI logic updates local state and tells index.js to swap model
     performActionEffect(action);
 
