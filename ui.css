@@ -26,7 +26,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 /* STATUS BARS */
 #bars {
   position: absolute;
-  top: 170px; /* TURUNKAN POSISI BAR */
+  top: 150px; /* TURUNKAN POSISI BAR */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -69,7 +69,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 /* NEW: Tooth Status - tanpa bar, gambar besar dan teks */
 #toothStatus {
   position: absolute;
-  top: 250px; /* TURUNKAN POSISI (di bawah bars) */
+  top: 280px; /* TURUNKAN POSISI (di bawah bars) */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
