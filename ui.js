@@ -10,6 +10,11 @@
   const splashScreen = document.getElementById('splashScreen');
   const startBtn = document.getElementById('startBtn');
 
+  // NEW: Credit elements
+  const creditBtn = document.getElementById('creditBtn');
+  const creditPopup = document.getElementById('creditPopup');
+  const closeCreditPopup = document.getElementById('closeCreditPopup');
+
   // NEW: Odontogram elements
   const odontogramBtn = document.getElementById('odontogramBtn');
   const odontogramPopup = document.getElementById('odontogramPopup');
@@ -43,6 +48,41 @@
 
   // track whether currently in XR session
   let inXR = false;
+
+  // NEW: Function to show credit popup
+  function showCreditPopup() {
+    if (creditPopup) {
+      creditPopup.classList.remove('hidden');
+      document.body.classList.add('popup-active');
+    }
+  }
+
+  // NEW: Function to hide credit popup
+  function hideCreditPopup() {
+    if (creditPopup) {
+      creditPopup.classList.add('hidden');
+      document.body.classList.remove('popup-active');
+    }
+  }
+
+  // NEW: Credit button click handler
+  if (creditBtn) {
+    creditBtn.addEventListener('click', showCreditPopup);
+  }
+
+  // NEW: Close credit popup handler
+  if (closeCreditPopup) {
+    closeCreditPopup.addEventListener('click', hideCreditPopup);
+  }
+
+  // Close credit popup when clicking outside content
+  if (creditPopup) {
+    creditPopup.addEventListener('click', (e) => {
+      if (e.target === creditPopup) {
+        hideCreditPopup();
+      }
+    });
+  }
 
   // NEW: Function to show splash screen
   function showSplashScreen() {

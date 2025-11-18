@@ -28,6 +28,119 @@ canvas {
   pointer-events: none;
 }
 
+/* NEW: Credit Button */
+.credit-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 25px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 101;
+  pointer-events: auto;
+}
+
+.credit-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.credit-btn:active {
+  transform: translateY(0);
+}
+
+.credit-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* NEW: Credit Popup */
+.credit-popup {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.credit-popup h3 {
+  color: white;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.credits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.credit-item {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.credit-item strong {
+  display: block;
+  font-size: 12px;
+  color: #4fc3f7;
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.credit-name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* NEW: Title Container */
+.title-container {
+  text-align: center;
+  margin-bottom: 30px;
+  pointer-events: none;
+}
+
+.main-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: white;
+  margin: 0 0 8px 0;
+  text-shadow: 
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #fff 0%, #e0f7fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 1px;
+}
+
+.subtitle {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #4fc3f7;
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
 /* NEW: Splash Screen */
 #splashScreen {
   position: absolute;
@@ -45,10 +158,10 @@ canvas {
 }
 
 #splashLogo {
-  width: 280px;
-  height: 280px;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
-  margin-bottom: 40px;
+  margin-bottom: 20px;
   filter: drop-shadow(0 8px 20px rgba(0,0,0,0.3));
 }
 
@@ -307,8 +420,8 @@ canvas {
   background: white;
   padding: 30px;
   border-radius: 20px;
-  width: 320px; /* Diperkecil dan dibuat sama panjang x lebarnya */
-  height: 450px; /* Diperkecil dan dibuat sama panjang x lebarnya */
+  width: 320px;
+  height: 450px;
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
@@ -361,8 +474,8 @@ canvas {
 }
 
 .odontogram-single img {
-  width: 300px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
-  height: 300px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
+  width: 300px;
+  height: 300px;
   object-fit: contain;
   margin-bottom: 15px;
 }
@@ -378,7 +491,6 @@ canvas {
   border-radius: 10px;
 }
 
-
 /* show AR-only controls */
 .visible-controls {
   opacity: 1 !important;
@@ -392,7 +504,7 @@ canvas {
 }
 
 /* Class untuk memblokir interaksi dengan elemen di belakang popup */
-.popup-active #ui > *:not(#odontogramPopup) {
+.popup-active #ui > *:not(#odontogramPopup):not(#creditPopup) {
   pointer-events: none !important;
   opacity: 0.7;
 }
