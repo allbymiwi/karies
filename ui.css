@@ -59,14 +59,35 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .bar-inner.damage { animation: blinkRed 0.4s ease; }
 @keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
 
-/* NEW: Tooth Status Text */
-.tooth-status-text {
-  flex: 1;
+/* NEW: Tooth Status - tanpa bar, gambar besar dan teks */
+#toothStatus {
+  position: absolute;
+  top: 240px; /* di bawah bars */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 50;
+}
+
+#toothStatusIcon {
+  width: 80px; /* gambar lebih besar */
+  height: 80px;
+  object-fit: contain;
+}
+
+#toothStatusText {
   color: #fff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   text-align: center;
-  padding: 4px 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.5);
+  padding: 6px 12px;
+  border-radius: 8px;
 }
 
 /* Buttons container */
@@ -195,7 +216,6 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .extra-btn:active {
   transform: scale(0.94);
 }
-
 
 /* show AR-only controls */
 .visible-controls {
