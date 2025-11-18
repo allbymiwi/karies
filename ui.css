@@ -135,7 +135,9 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   display: flex;
   gap: 20px;
   z-index: 60;
-  pointer-events: auto;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .scale-btn {
@@ -157,13 +159,15 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 /* Extra Buttons (Reset & Exit) – moved to top center */
 #extraButtons {
   position: absolute;
-  top: 90px; /* below Enter AR button */
+  top: 85px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 16px;
   z-index: 65;
-  pointer-events: auto;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .extra-btn {
