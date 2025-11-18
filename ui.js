@@ -9,6 +9,8 @@
   // NEW: Tooth status elements
   const toothStatusIcon = document.getElementById('toothStatusIcon');
   const toothStatusText = document.getElementById('toothStatusText');
+  const barsContainer = document.getElementById('bars');
+  const toothStatusContainer = document.getElementById('toothStatus');
 
   // NEW extra buttons
   const resetBtn = document.getElementById('resetBtn');
@@ -70,6 +72,24 @@
     }
   }
 
+  // NEW: Function to show/hide AR UI elements
+  function showARUI(show) {
+    if (barsContainer) {
+      if (show) {
+        barsContainer.classList.add('visible-ar');
+      } else {
+        barsContainer.classList.remove('visible-ar');
+      }
+    }
+    if (toothStatusContainer) {
+      if (show) {
+        toothStatusContainer.classList.add('visible-ar');
+      } else {
+        toothStatusContainer.classList.remove('visible-ar');
+      }
+    }
+  }
+
   // initially buttons disabled until model placed; extra/scale hidden (CSS handles hidden by default)
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
@@ -103,9 +123,13 @@
     if (show) {
       if (extraButtonsContainer) extraButtonsContainer.classList.add('visible-controls');
       if (scaleButtonsContainer) scaleButtonsContainer.classList.add('visible-controls');
+      // NEW: Show AR UI elements
+      showARUI(true);
     } else {
       if (extraButtonsContainer) extraButtonsContainer.classList.remove('visible-controls');
       if (scaleButtonsContainer) scaleButtonsContainer.classList.remove('visible-controls');
+      // NEW: Hide AR UI elements
+      showARUI(false);
     }
     // When hiding AR controls, ensure they can't be focused or clicked
     if (!show) {
@@ -245,7 +269,7 @@
     if (xrBtn) xrBtn.classList.add('hidden');
     fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
 
-    // show AR controls (scale + extra)
+    // show AR controls (scale + extra) and AR UI elements
     showARControls(true);
 
     // note: action buttons still controlled by model-placed (so they remain disabled until model is placed)
@@ -258,7 +282,7 @@
     setButtonsEnabled(false);
     fadeInfo("AR berhenti. Arahkan kamera ke lantai dan tekan Enter AR.");
 
-    // hide AR-only controls
+    // hide AR-only controls and AR UI elements
     showARControls(false);
     
     // NEW: Reset tooth status when AR ends
