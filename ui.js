@@ -10,6 +10,10 @@
   const resetBtn = document.getElementById('resetBtn');
   const exitBtn = document.getElementById('exitBtn');
 
+  // NEW scale buttons
+  const scaleUpBtn = document.getElementById('scaleUpBtn');
+  const scaleDownBtn = document.getElementById('scaleDownBtn');
+
   let toothReady = false;
   let cleanValue = 100;
   let healthValue = 100;
@@ -26,6 +30,20 @@
       b.tabIndex = enabled ? 0 : -1;
       if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
     });
+    // scale buttons follow action-buttons (only usable when model placed)
+    if (scaleUpBtn) {
+      scaleUpBtn.style.opacity = enabled ? '1' : '0.55';
+      scaleUpBtn.style.pointerEvents = enabled ? 'auto' : 'none';
+      scaleUpBtn.tabIndex = enabled ? 0 : -1;
+      if (enabled) scaleUpBtn.removeAttribute('aria-disabled'); else scaleUpBtn.setAttribute('aria-disabled', 'true');
+    }
+    if (scaleDownBtn) {
+      scaleDownBtn.style.opacity = enabled ? '1' : '0.55';
+      scaleDownBtn.style.pointerEvents = enabled ? 'auto' : 'none';
+      scaleDownBtn.tabIndex = enabled ? 0 : -1;
+      if (enabled) scaleDownBtn.removeAttribute('aria-disabled'); else scaleDownBtn.setAttribute('aria-disabled', 'true');
+    }
+
     // extra buttons (reset/exit) remain interactive even when action buttons are disabled
     if (resetBtn) {
       resetBtn.style.opacity = '1';
@@ -69,6 +87,26 @@
       window.dispatchEvent(new CustomEvent('ui-action-request', { detail: { action } }));
     });
   });
+
+  // Scale buttons -> dispatch scale-request
+  if (scaleUpBtn) {
+    scaleUpBtn.addEventListener('click', () => {
+      if (!toothReady) {
+        fadeInfo("Tempatkan model terlebih dahulu untuk mengubah ukuran.");
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('scale-request', { detail: { dir: +1 } }));
+    });
+  }
+  if (scaleDownBtn) {
+    scaleDownBtn.addEventListener('click', () => {
+      if (!toothReady) {
+        fadeInfo("Tempatkan model terlebih dahulu untuk mengubah ukuran.");
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('scale-request', { detail: { dir: -1 } }));
+    });
+  }
 
   // Reset button -> dispatch reset & update UI state
   if (resetBtn) {

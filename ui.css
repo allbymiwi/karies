@@ -1,4 +1,4 @@
-/* ui.css - cleaned (with reset/exit buttons moved to top center) */
+/* ui.css - cleaned (with reset/exit buttons moved to top center + scale buttons) */
 body {
   margin: 0;
   overflow: hidden;
@@ -84,6 +84,34 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .action-btn.brush img { background:#b2e8ff; }
 .action-btn.healthy img { background:#c8f7c2; }
 .action-btn.sweet img { background:#ffd4e1; }
+
+/* SCALE BUTTONS (Perbesar & Perkecil) */
+#scaleButtons {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 40px; /* posisi persis di bawah 3 tombol aksi */
+  pointer-events: auto;
+  z-index: 45;
+}
+
+.scale-btn {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, #3d7cff, #0043c7);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  transition: transform 0.15s ease, opacity 0.2s ease;
+}
+
+.scale-btn:active {
+  transform: scale(0.94);
+}
 
 /* info text */
 #infoText {
