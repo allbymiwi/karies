@@ -48,27 +48,27 @@
     switch(healthKey) {
       case 100: // gigisehat.glb
         toothStatusIcon.src = 'odontogram/odontogram_normal.png';
-        toothStatusText.textContent = 'Gigi sehat';
+        toothStatusText.textContent = 'Odontogram: Gigi sehat';
         break;
       case 75: // gigiplak.glb
         toothStatusIcon.src = 'odontogram/odontogram_normal.png';
-        toothStatusText.textContent = 'Gigi plak';
+        toothStatusText.textContent = 'Odontogram: Gigi sehat';
         break;
       case 50: // gigiasam.glb
         toothStatusIcon.src = 'odontogram/odontogram_karang.png';
-        toothStatusText.textContent = 'Gigi asam';
+        toothStatusText.textContent = 'Odontogram: Gigi karang';
         break;
       case 25: // gigidemineralisasi.glb
         toothStatusIcon.src = 'odontogram/odontogram_karang.png';
-        toothStatusText.textContent = 'Gigi demineralisasi';
+        toothStatusText.textContent = 'Odontogram: Gigi karang';
         break;
       case 0: // gigikaries.glb
         toothStatusIcon.src = 'odontogram/odontogram_karies.png';
-        toothStatusText.textContent = 'Gigi karies';
+        toothStatusText.textContent = 'Odontogram: Gigi karies';
         break;
       default:
         toothStatusIcon.src = 'odontogram/odontogram_hilang.png';
-        toothStatusText.textContent = 'Gigi tidak ada';
+        toothStatusText.textContent = 'Odontogram: Gigi hilang';
     }
   }
 
