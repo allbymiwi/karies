@@ -209,9 +209,6 @@
       scaleDownBtn.tabIndex = enabled ? 0 : -1;
       if (enabled) scaleDownBtn.removeAttribute('aria-disabled'); else scaleDownBtn.setAttribute('aria-disabled', 'true');
     }
-
-    // NOTE: Reset / Exit visibility & interactivity are controlled by inXR + CSS class.
-    // Do NOT force them here; they become interactive when inXR === true and container has .visible-controls.
   }
   setButtonsEnabled(false);
 
@@ -228,19 +225,6 @@
       if (scaleButtonsContainer) scaleButtonsContainer.classList.remove('visible-controls');
       // NEW: Hide AR UI elements
       showARUI(false);
-    }
-    // When hiding AR controls, ensure they can't be focused or clicked
-    if (!show) {
-      if (resetBtn) { resetBtn.tabIndex = -1; resetBtn.setAttribute('aria-hidden', 'true'); }
-      if (exitBtn)  { exitBtn.tabIndex = -1;  exitBtn.setAttribute('aria-hidden', 'true'); }
-      if (scaleUpBtn) { scaleUpBtn.tabIndex = -1; scaleUpBtn.setAttribute('aria-hidden', 'true'); }
-      if (scaleDownBtn) { scaleDownBtn.tabIndex = -1; scaleDownBtn.setAttribute('aria-hidden', 'true'); }
-    } else {
-      if (resetBtn) { resetBtn.tabIndex = 0; resetBtn.removeAttribute('aria-hidden'); }
-      if (exitBtn)  { exitBtn.tabIndex = 0;  exitBtn.removeAttribute('aria-hidden'); }
-      // scale buttons remain controlled by setButtonsEnabled (enabled only when model placed)
-      if (scaleUpBtn) scaleUpBtn.removeAttribute('aria-hidden');
-      if (scaleDownBtn) scaleDownBtn.removeAttribute('aria-hidden');
     }
   }
 
@@ -336,8 +320,6 @@
     }
 
     // Dispatch last action so index.js knows which button triggered this animation
-    // (Important: we dispatch BEFORE performActionEffect so index.js can choose message
-    //  based on both lastAction and the updated health.)
     window.dispatchEvent(new CustomEvent('ui-last-action', { detail: { action } }));
 
     // After a successful animation, UI logic updates local state and tells index.js to swap model
@@ -351,7 +333,6 @@
     if (cleanValue <= 0 && healthValue <= 0) {
       setButtonsEnabled(false);
       fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
-      // keep Enter AR handled by xr-ended when session ends
     } else {
       setButtonsEnabled(true);
     }
@@ -367,13 +348,10 @@
 
   // when XR started: hide Enter AR button and show AR-only controls
   window.addEventListener('xr-started', () => {
-    // XR button sudah hidden dari awal, jadi tidak perlu diubah
     fadeInfo("Arahkan kamera ke lantai untuk memunculkan gigi.");
 
     // show AR controls (scale + extra) and AR UI elements
     showARControls(true);
-
-    // note: action buttons still controlled by model-placed (so they remain disabled until model is placed)
   });
 
   // when XR ended: langsung kembali ke splash screen tanpa show tombol Enter AR

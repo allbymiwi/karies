@@ -195,11 +195,6 @@ function initThree() {
 
     // clear last action so subsequent health messages revert to normal behavior
     lastAction = null;
-    
-    // NEW: Trigger health-changed to reset tooth status
-    window.dispatchEvent(new CustomEvent('health-changed', { 
-      detail: { health: null, clean: null } 
-    }));
   });
 
   // NEW: respond to exit request from UI
@@ -608,15 +603,7 @@ function swapModelForHealthAfterDelay(healthKey) {
 
       if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
         window.kariesUI.fadeInfo(msgSame);
-      } else {
-        window.dispatchEvent(new CustomEvent('health-stage-info', { detail: { msg: msgSame, key: healthKey } }));
       }
-      
-      // NEW: Trigger health-changed to update tooth status UI
-      window.dispatchEvent(new CustomEvent('health-changed', { 
-        detail: { health: healthKey, clean: null } 
-      }));
-      
     } catch (e) { /* ignore */ }
     return;
   }
@@ -670,15 +657,7 @@ function swapModelForHealthAfterDelay(healthKey) {
       try {
         if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
           window.kariesUI.fadeInfo(stateMsg);
-        } else {
-          window.dispatchEvent(new CustomEvent('health-stage-info', { detail: { msg: stateMsg, key: healthKey } }));
         }
-        
-        // NEW: Trigger health-changed to update tooth status UI
-        window.dispatchEvent(new CustomEvent('health-changed', { 
-          detail: { health: healthKey, clean: null } 
-        }));
-        
       } catch (e) { /* ignore */ }
 
       return;
@@ -706,15 +685,7 @@ function swapModelForHealthAfterDelay(healthKey) {
         try {
           if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
             window.kariesUI.fadeInfo(stateMsg);
-          } else {
-            window.dispatchEvent(new CustomEvent('health-stage-info', { detail: { msg: stateMsg, key: healthKey } }));
           }
-          
-          // NEW: Trigger health-changed to update tooth status UI
-          window.dispatchEvent(new CustomEvent('health-changed', { 
-            detail: { health: healthKey, clean: null } 
-          }));
-          
         } catch (e) { /* ignore */ }
       },
       undefined,
@@ -791,9 +762,6 @@ async function onSessionStarted(session) {
 
 function onSessionEnded() {
   xrSession = null;
-  // HAPUS: jangan set text atau show tombol Enter AR
-  // xrBtn.textContent = 'Enter AR';
-  // xrBtn.classList.remove('hidden');
 
   // INFORM UI that XR ended
   window.dispatchEvent(new CustomEvent('xr-ended'));
@@ -828,15 +796,6 @@ function onSelect() {
     objectPlaced = true;
     reticle.visible = false;
     window.dispatchEvent(new CustomEvent('model-placed', { detail: newModel }));
-    
-    // PERBAIKAN: HANYA dispatch event model-placed, biar UI yang handle text info
-    // JANGAN panggil fadeInfo atau getHealthStateMessage di sini
-    
-    // NEW: Trigger health-changed to update tooth status to initial state
-    window.dispatchEvent(new CustomEvent('health-changed', { 
-      detail: { health: DEFAULT_HEALTH_KEY, clean: null } 
-    }));
-    
     return;
   }
 
@@ -853,15 +812,6 @@ function onSelect() {
     objectPlaced = true;
     reticle.visible = false;
     window.dispatchEvent(new CustomEvent('model-placed', { detail: model }));
-    
-    // PERBAIKAN: HANYA dispatch event model-placed, biar UI yang handle text info
-    // JANGAN panggil fadeInfo atau getHealthStateMessage di sini
-    
-    // NEW: Trigger health-changed to update tooth status to initial state
-    window.dispatchEvent(new CustomEvent('health-changed', { 
-      detail: { health: DEFAULT_HEALTH_KEY, clean: null } 
-    }));
-    
   }, undefined, (err) => {
     console.error('Error loading initial model:', err);
     alert('Gagal memuat model awal. Cek console.');
