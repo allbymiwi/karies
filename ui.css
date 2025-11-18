@@ -127,7 +127,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .visible-controls {
   opacity: 1 !important;
   pointer-events: auto !important;
-  transform: translateY(0) !important;
+  transform: translateX(-50%) translateY(0) !important;
 }
 
 /* info text */
@@ -174,7 +174,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 /* Extra Buttons (Reset & Exit) – moved to top center */
 #extraButtons {
   position: absolute;
-  top: 90px; /* below Enter AR button */
+  top: 85px; /* below Enter AR button */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
