@@ -35,11 +35,8 @@
       </div>
     </div>
 
-    <!-- Tooth Status -->
-    <div id="toothStatus">
-      <img src="odontogram/odontogram_hilang.png" id="toothStatusIcon" alt="Status Gigi">
-      <div id="toothStatusText">Gigi tidak ada</div>
-    </div>
+    <!-- Tombol Cek Odontogram -->
+    <button id="odontogramBtn" class="odontogram-btn">Cek Odontogram</button>
 
     <div id="infoText">Tekan Enter AR. Lalu arahkan kamera ke lantai hingga muncul lingkaran hijau dan tekan lingkaran untuk memunculkan gigi!</div>
 
@@ -70,6 +67,32 @@
     <div id="extraButtons">
       <button id="resetBtn" class="extra-btn">Reset</button>
       <button id="exitBtn" class="extra-btn">Exit AR</button>
+    </div>
+
+    <!-- Popup Odontogram -->
+    <div id="odontogramPopup" class="popup hidden">
+      <div class="popup-content">
+        <button id="closePopup" class="close-btn">&times;</button>
+        <h3>Keterangan Odontogram</h3>
+        <div class="odontogram-grid">
+          <div class="odontogram-item">
+            <img src="odontogram/odontogram_normal.png" alt="Gigi Normal">
+            <p><strong>Gigi Normal:</strong> Gigi sehat tanpa masalah</p>
+          </div>
+          <div class="odontogram-item">
+            <img src="odontogram/odontogram_karang.png" alt="Gigi Bermasalah">
+            <p><strong>Gigi Bermasalah:</strong> Ada karang gigi atau plak</p>
+          </div>
+          <div class="odontogram-item">
+            <img src="odontogram/odontogram_karies.png" alt="Gigi Karies">
+            <p><strong>Gigi Karies:</strong> Gigi berlubang/rusak</p>
+          </div>
+          <div class="odontogram-item">
+            <img src="odontogram/odontogram_hilang.png" alt="Gigi Hilang">
+            <p><strong>Gigi Hilang:</strong> Gigi tidak ada/tanggal</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

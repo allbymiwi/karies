@@ -10,11 +10,12 @@
   const splashScreen = document.getElementById('splashScreen');
   const startBtn = document.getElementById('startBtn');
 
-  // NEW: Tooth status elements
-  const toothStatusIcon = document.getElementById('toothStatusIcon');
-  const toothStatusText = document.getElementById('toothStatusText');
+  // NEW: Odontogram elements
+  const odontogramBtn = document.getElementById('odontogramBtn');
+  const odontogramPopup = document.getElementById('odontogramPopup');
+  const closePopup = document.getElementById('closePopup');
+
   const barsContainer = document.getElementById('bars');
-  const toothStatusContainer = document.getElementById('toothStatus');
   const buttonsContainer = document.getElementById('buttons');
   const infoContainer = document.getElementById('infoText');
 
@@ -85,46 +86,36 @@
     });
   }
 
-  // NEW: Function to update tooth status based on current health model
-  function updateToothStatus(healthKey = null) {
-    if (!toothReady || healthKey === null) {
-      // No tooth placed
-      toothStatusIcon.src = 'odontogram/odontogram_hilang.png';
-      toothStatusText.textContent = 'Gigi tidak ada';
-      return;
-    }
+  // NEW: Odontogram button click handler
+  if (odontogramBtn) {
+    odontogramBtn.addEventListener('click', () => {
+      if (!inXR) {
+        fadeInfo("Fitur ini hanya tersedia saat berada di AR.");
+        return;
+      }
+      odontogramPopup.classList.remove('hidden');
+    });
+  }
 
-    // Update based on health key
-    switch(healthKey) {
-      case 100: // gigisehat.glb
-        toothStatusIcon.src = 'odontogram/odontogram_normal.png';
-        toothStatusText.textContent = 'Gigi sehat';
-        break;
-      case 75: // gigiplak.glb
-        toothStatusIcon.src = 'odontogram/odontogram_normal.png';
-        toothStatusText.textContent = 'Gigi plak';
-        break;
-      case 50: // gigiasam.glb
-        toothStatusIcon.src = 'odontogram/odontogram_karang.png';
-        toothStatusText.textContent = 'Gigi asam';
-        break;
-      case 25: // gigidemineralisasi.glb
-        toothStatusIcon.src = 'odontogram/odontogram_karang.png';
-        toothStatusText.textContent = 'Gigi demineralisasi';
-        break;
-      case 0: // gigikaries.glb
-        toothStatusIcon.src = 'odontogram/odontogram_karies.png';
-        toothStatusText.textContent = 'Gigi karies';
-        break;
-      default:
-        toothStatusIcon.src = 'odontogram/odontogram_hilang.png';
-        toothStatusText.textContent = 'Gigi tidak ada';
-    }
+  // NEW: Close popup handler
+  if (closePopup) {
+    closePopup.addEventListener('click', () => {
+      odontogramPopup.classList.add('hidden');
+    });
+  }
+
+  // Close popup when clicking outside content
+  if (odontogramPopup) {
+    odontogramPopup.addEventListener('click', (e) => {
+      if (e.target === odontogramPopup) {
+        odontogramPopup.classList.add('hidden');
+      }
+    });
   }
 
   // NEW: Function to show/hide AR UI elements
   function showARUI(show) {
-    const elements = [barsContainer, toothStatusContainer, buttonsContainer, infoContainer];
+    const elements = [barsContainer, buttonsContainer, infoContainer, odontogramBtn];
     
     elements.forEach(element => {
       if (element) {
@@ -310,8 +301,6 @@
     fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
     setButtonsEnabled(true);
     updateBars();
-    // NEW: Update tooth status to initial healthy state
-    updateToothStatus(100);
   });
 
   // when XR started: hide Enter AR button and show AR-only controls
@@ -333,9 +322,6 @@
     // hide AR-only controls and AR UI elements
     showARControls(false);
     
-    // NEW: Reset tooth status when AR ends
-    updateToothStatus(null);
-    
     // NEW: Langsung show splash screen tanpa menampilkan tombol Enter AR
     showSplashScreen();
   });
@@ -345,22 +331,10 @@
     const d = e.detail || {};
     if (typeof d.health === 'number') {
       healthValue = d.health;
-      // NEW: Update tooth status based on health value
-      const healthKey = getHealthKeyFromValue(healthValue);
-      updateToothStatus(healthKey);
     }
     if (typeof d.clean === 'number') cleanValue = d.clean;
     updateBars();
   });
-
-  // NEW: Helper function to convert health value to health key
-  function getHealthKeyFromValue(health) {
-    if (health >= 100) return 100;
-    if (health >= 75) return 75;
-    if (health >= 50) return 50;
-    if (health >= 25) return 25;
-    return 0;
-  }
 
   // apply the "game logic" to UI values AFTER animations finish (called by interactor-finished)
   function performActionEffect(action) {
@@ -407,8 +381,6 @@
     toothReady = false;
     setButtonsEnabled(false);
     updateBars();
-    // NEW: Reset tooth status
-    updateToothStatus(null);
   }
 
   // expose for debugging
@@ -416,7 +388,6 @@
     setButtonsEnabled,
     updateBars,
     fadeInfo,
-    updateToothStatus, // NEW: expose tooth status function
     startARSession, // NEW: expose start AR function
     _getState: () => ({ cleanValue, healthValue, sweetCount, healthyCount })
   };
@@ -425,6 +396,4 @@
   updateBars();
   // ensure AR controls hidden initially
   showARControls(false);
-  // NEW: Initialize tooth status
-  updateToothStatus(null);
 })();
