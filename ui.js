@@ -41,11 +41,27 @@
   // track whether currently in XR session
   let inXR = false;
 
+  // NEW: Function to show splash screen
+  function showSplashScreen() {
+    if (splashScreen) {
+      splashScreen.classList.remove('hidden');
+    }
+    // Reset semua state UI
+    resetUIState();
+  }
+
+  // NEW: Function to hide splash screen
+  function hideSplashScreen() {
+    if (splashScreen) {
+      splashScreen.classList.add('hidden');
+    }
+  }
+
   // NEW: Start button click handler
   if (startBtn) {
     startBtn.addEventListener('click', () => {
       // Hide splash screen
-      splashScreen.classList.add('hidden');
+      hideSplashScreen();
       // Show XR button and trigger AR session
       xrBtn.classList.remove('hidden');
       xrBtn.click(); // Automatically trigger AR session
@@ -227,7 +243,12 @@
     exitBtn.addEventListener('click', () => {
       if (!inXR) { fadeInfo("Fitur ini hanya tersedia saat berada di AR."); return; }
       window.dispatchEvent(new CustomEvent('request-exit-ar'));
-      fadeInfo("Meminta keluar AR...");
+      fadeInfo("Keluar AR...");
+      
+      // NEW: Show splash screen after a short delay
+      setTimeout(() => {
+        showSplashScreen();
+      }, 500);
     });
   }
 
@@ -301,6 +322,11 @@
     
     // NEW: Reset tooth status when AR ends
     updateToothStatus(null);
+    
+    // NEW: Show splash screen when XR session ends (baik dari exit AR maupun session end natural)
+    setTimeout(() => {
+      showSplashScreen();
+    }, 500);
   });
 
   // local state changes (if some other part dispatches health-changed directly)

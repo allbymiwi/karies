@@ -84,7 +84,7 @@ canvas {
 /* STATUS BARS */
 #bars {
   position: absolute;
-  top: 170px;
+  top: 150px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -127,7 +127,7 @@ canvas {
 /* Tooth Status - tanpa bar, gambar besar dan teks */
 #toothStatus {
   position: absolute;
-  top: 250px;
+  top: 280px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
