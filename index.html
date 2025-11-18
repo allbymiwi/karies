@@ -7,14 +7,20 @@
   <link rel="stylesheet" href="./ui.css">
 </head>
 <body>
-  <!-- XR Button (center top) -->
-  <button id="xrBtn" class="xr-btn">Enter AR</button>
+  <!-- XR Button (center top) - SEMULA HIDDEN -->
+  <button id="xrBtn" class="xr-btn hidden">Enter AR</button>
 
   <!-- AR canvas -->
   <canvas id="canvas"></canvas>
 
   <!-- UI overlay -->
   <div id="ui">
+    <!-- NEW: Splash Screen -->
+    <div id="splashScreen">
+      <img src="logoar.png" alt="kARies Logo" id="splashLogo">
+      <button id="startBtn" class="start-btn">Mulai!</button>
+    </div>
+
     <div id="bars">
       <div class="status-bar clean">
         <img src="icons/water.png" class="status-icon" alt="Kebersihan">
@@ -29,7 +35,7 @@
       </div>
     </div>
 
-    <!-- NEW: Tooth Status - tanpa bar, hanya gambar besar dan teks -->
+    <!-- Tooth Status -->
     <div id="toothStatus">
       <img src="odontogram/odontogram_hilang.png" id="toothStatusIcon" alt="Status Gigi">
       <div id="toothStatusText">Gigi tidak ada</div>
@@ -54,13 +60,13 @@
       </button>
     </div>
 
-    <!-- NEW: Scale Buttons - under action buttons (middle bottom) -->
+    <!-- Scale Buttons -->
     <div id="scaleButtons">
       <button id="scaleUpBtn" class="scale-btn">Perbesar</button>
       <button id="scaleDownBtn" class="scale-btn">Perkecil</button>
     </div>
 
-    <!-- NEW: extra buttons under action buttons -->
+    <!-- Extra buttons -->
     <div id="extraButtons">
       <button id="resetBtn" class="extra-btn">Reset</button>
       <button id="exitBtn" class="extra-btn">Exit AR</button>

@@ -7,7 +7,12 @@ body {
 }
 
 /* canvas full */
-canvas { display:block; width:100vw; height:100vh; position: absolute; }
+canvas { 
+  display:block; 
+  width:100vw; 
+  height:100vh; 
+  position: absolute; 
+}
 
 /* UI Overlay */
 #ui {
@@ -23,10 +28,63 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   pointer-events: none;
 }
 
+/* NEW: Splash Screen */
+#splashScreen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 100;
+  pointer-events: auto;
+}
+
+#splashLogo {
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  margin-bottom: 40px;
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,0.3));
+}
+
+.start-btn {
+  padding: 16px 40px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 8px 25px rgba(238, 90, 82, 0.4);
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.start-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(238, 90, 82, 0.6);
+}
+
+.start-btn:active {
+  transform: translateY(-1px);
+}
+
+/* Hide splash when AR starts */
+#splashScreen.hidden {
+  display: none;
+}
+
 /* STATUS BARS */
 #bars {
   position: absolute;
-  top: 150px; /* TURUNKAN POSISI BAR */
+  top: 170px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -35,7 +93,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   align-items: center;
   pointer-events: none;
   z-index: 50;
-  opacity: 0; /* SEMULA HIDDEN */
+  opacity: 0;
   transition: opacity 0.3s ease;
 }
 
@@ -66,10 +124,10 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .bar-inner.damage { animation: blinkRed 0.4s ease; }
 @keyframes blinkRed { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(2);} }
 
-/* NEW: Tooth Status - tanpa bar, gambar besar dan teks */
+/* Tooth Status - tanpa bar, gambar besar dan teks */
 #toothStatus {
   position: absolute;
-  top: 280px; /* TURUNKAN POSISI (di bawah bars) */
+  top: 250px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -78,7 +136,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   gap: 8px;
   pointer-events: none;
   z-index: 50;
-  opacity: 0; /* SEMULA HIDDEN */
+  opacity: 0;
   transition: opacity 0.3s ease;
 }
 
@@ -88,7 +146,7 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 }
 
 #toothStatusIcon {
-  width: 80px; /* gambar lebih besar */
+  width: 80px;
   height: 80px;
   object-fit: contain;
 }
@@ -114,6 +172,13 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   margin-bottom: 96px;
   pointer-events: auto;
   z-index: 45;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* TAMBAHKAN CLASS UNTUK SHOW BUTTONS SAAT AR */
+#buttons.visible-ar {
+  opacity: 1;
 }
 
 .action-btn {
@@ -145,9 +210,15 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   pointer-events:auto;
   transition: opacity 0.3s ease;
   z-index: 46;
+  opacity: 0;
 }
 
-/* XR button - centered top */
+/* TAMBAHKAN CLASS UNTUK SHOW INFO TEXT SAAT AR */
+#infoText.visible-ar {
+  opacity: 1;
+}
+
+/* XR button - centered top (HIDDEN BY DEFAULT) */
 .xr-btn {
   position: absolute;
   top: 18px;

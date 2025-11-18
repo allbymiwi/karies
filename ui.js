@@ -6,11 +6,17 @@
   const buttons = Array.from(document.querySelectorAll('.action-btn'));
   const xrBtn = document.getElementById('xrBtn');
 
+  // NEW: Splash screen elements
+  const splashScreen = document.getElementById('splashScreen');
+  const startBtn = document.getElementById('startBtn');
+
   // NEW: Tooth status elements
   const toothStatusIcon = document.getElementById('toothStatusIcon');
   const toothStatusText = document.getElementById('toothStatusText');
   const barsContainer = document.getElementById('bars');
   const toothStatusContainer = document.getElementById('toothStatus');
+  const buttonsContainer = document.getElementById('buttons');
+  const infoContainer = document.getElementById('infoText');
 
   // NEW extra buttons
   const resetBtn = document.getElementById('resetBtn');
@@ -35,6 +41,17 @@
   // track whether currently in XR session
   let inXR = false;
 
+  // NEW: Start button click handler
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      // Hide splash screen
+      splashScreen.classList.add('hidden');
+      // Show XR button and trigger AR session
+      xrBtn.classList.remove('hidden');
+      xrBtn.click(); // Automatically trigger AR session
+    });
+  }
+
   // NEW: Function to update tooth status based on current health model
   function updateToothStatus(healthKey = null) {
     if (!toothReady || healthKey === null) {
@@ -48,46 +65,43 @@
     switch(healthKey) {
       case 100: // gigisehat.glb
         toothStatusIcon.src = 'odontogram/odontogram_normal.png';
-        toothStatusText.textContent = 'Odontogram: Gigi sehat';
+        toothStatusText.textContent = 'Gigi sehat';
         break;
       case 75: // gigiplak.glb
         toothStatusIcon.src = 'odontogram/odontogram_normal.png';
-        toothStatusText.textContent = 'Odontogram: Gigi sehat';
+        toothStatusText.textContent = 'Gigi plak';
         break;
       case 50: // gigiasam.glb
         toothStatusIcon.src = 'odontogram/odontogram_karang.png';
-        toothStatusText.textContent = 'Odontogram: Gigi karang';
+        toothStatusText.textContent = 'Gigi asam';
         break;
       case 25: // gigidemineralisasi.glb
         toothStatusIcon.src = 'odontogram/odontogram_karang.png';
-        toothStatusText.textContent = 'Odontogram: Gigi karang';
+        toothStatusText.textContent = 'Gigi demineralisasi';
         break;
       case 0: // gigikaries.glb
         toothStatusIcon.src = 'odontogram/odontogram_karies.png';
-        toothStatusText.textContent = 'Odontogram: Gigi karies';
+        toothStatusText.textContent = 'Gigi karies';
         break;
       default:
         toothStatusIcon.src = 'odontogram/odontogram_hilang.png';
-        toothStatusText.textContent = 'Odontogram: Gigi hilang';
+        toothStatusText.textContent = 'Gigi tidak ada';
     }
   }
 
   // NEW: Function to show/hide AR UI elements
   function showARUI(show) {
-    if (barsContainer) {
-      if (show) {
-        barsContainer.classList.add('visible-ar');
-      } else {
-        barsContainer.classList.remove('visible-ar');
+    const elements = [barsContainer, toothStatusContainer, buttonsContainer, infoContainer];
+    
+    elements.forEach(element => {
+      if (element) {
+        if (show) {
+          element.classList.add('visible-ar');
+        } else {
+          element.classList.remove('visible-ar');
+        }
       }
-    }
-    if (toothStatusContainer) {
-      if (show) {
-        toothStatusContainer.classList.add('visible-ar');
-      } else {
-        toothStatusContainer.classList.remove('visible-ar');
-      }
-    }
+    });
   }
 
   // initially buttons disabled until model placed; extra/scale hidden (CSS handles hidden by default)
