@@ -49,15 +49,15 @@ let spotLight = null;
 function getHealthStateMessage(healthKey) {
   switch (healthKey) {
     case 100:
-      return "😁 Gigi sangat sehat — terawat dengan baik!";
+      return "😁 Makan makanan manis boleh tapi jangan terlalu sering ya!";
     case 75:
-      return "🙂 Ada sedikit plak — perawatan ringan disarankan.";
+      return "🙂 Waduh! Ada sedikit plak yang menempel akibat kamu memakan makanan manis dan tidak menggosok gigi... Kamu harus segera menggosok gigimu ya!";
     case 50:
-      return "😬 Plak terlihat jelas — mulai perawatan rutin.";
+      return "😬 Oh tidak! Sukrosa yang terdapat pada sisa makanan menimbulkan bakteri dan membentuk asam laktat. Kalau tidak segera menggosok gigi, nanti gigimu berlubang lho!";
     case 25:
-      return "⚠️ Gigi terdemineralisasi — rawat lebih intensif.";
+      return "⚠️ Hey jangan makan makanan manis terus dong... Gigimu jadi berlubang. Yuk makan makanan sehat dan berserat dan menggosok gigi agar gigimu tetap sehat!";
     case 0:
-      return "🚨 Karies parah — segera konsultasi profesional!";
+      return "🚨 Yah... Gigimu sudah berlubang hingga mencapai saraf gigi dan menimbulkan infeksi. Segera konsultasi ke dokter gigi ya! Kamu bisa menekan tombol RESET untuk memulai ulang.";
     default:
       return "Status gigi berubah.";
   }
