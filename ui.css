@@ -307,12 +307,15 @@ canvas {
   background: white;
   padding: 30px;
   border-radius: 20px;
-  max-width: 500px;
-  width: 90%;
+  width: 350px; /* Diperkecil dan dibuat sama panjang x lebarnya */
+  height: 350px; /* Diperkecil dan dibuat sama panjang x lebarnya */
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .close-btn {
@@ -350,16 +353,18 @@ canvas {
 .odontogram-single {
   text-align: center;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
 
 .odontogram-single img {
-  width: 300px; /* 3x lipat dari 120px */
-  height: 300px; /* 3x lipat dari 120px */
+  width: 200px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
+  height: 200px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
   object-fit: contain;
-  margin-bottom: 25px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
+  margin-bottom: 15px;
 }
 
 .odontogram-single p {
