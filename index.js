@@ -1,4 +1,6 @@
 // index.js (ORBIT-ONLY brush) - full file (plus xrBtn hide/show)
+// Updated: add pinch-to-zoom / wheel zoom and preserve scale across model swaps
+
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
 
@@ -193,6 +195,92 @@ function initThree() {
   window.addEventListener('request-exit-ar', () => {
     endXRSession();
   });
+
+  // ---------- New: Pinch / Wheel Zoom Support ----------
+  // We'll use Pointer Events to support multi-touch pinch reliably.
+  const pointers = new Map(); // pointerId -> {x,y}
+  let isPinching = false;
+  let pinchStartDist = 0;
+  let pinchStartScale = BASE_SCALE;
+  const MIN_SCALE = 0.05;
+  const MAX_SCALE = 2.0;
+
+  function getDistanceBetweenPointers() {
+    const it = pointers.values();
+    const a = it.next().value;
+    const b = it.next().value;
+    if (!a || !b) return 0;
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.hypot(dx, dy);
+  }
+
+  function startPinch() {
+    if (!placedObject) return;
+    pinchStartDist = getDistanceBetweenPointers();
+    // use current object's uniform scale as baseline
+    pinchStartScale = placedObject.scale.x || BASE_SCALE;
+    isPinching = pinchStartDist > 0;
+    // optional: give user feedback
+    // console.log('pinch start', pinchStartDist, pinchStartScale);
+  }
+
+  function updatePinch() {
+    if (!isPinching || !placedObject) return;
+    const dist = getDistanceBetweenPointers();
+    if (!dist || pinchStartDist === 0) return;
+    const factor = dist / pinchStartDist;
+    let newScale = pinchStartScale * factor;
+    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+    placedObject.scale.setScalar(newScale);
+  }
+
+  function endPinch() {
+    isPinching = false;
+    pinchStartDist = 0;
+  }
+
+  // Pointer handlers attached to canvas
+  canvas.addEventListener('pointerdown', (ev) => {
+    // Only handle touches or mouse — ignore stylus if desired; we'll accept all pointer types
+    canvas.setPointerCapture(ev.pointerId);
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size === 2) {
+      startPinch();
+    }
+  });
+
+  canvas.addEventListener('pointermove', (ev) => {
+    if (!pointers.has(ev.pointerId)) return;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size === 2 && isPinching) {
+      updatePinch();
+    }
+  });
+
+  canvas.addEventListener('pointerup', (ev) => {
+    try { canvas.releasePointerCapture(ev.pointerId); } catch (e) {}
+    pointers.delete(ev.pointerId);
+    if (isPinching && pointers.size < 2) endPinch();
+  });
+
+  canvas.addEventListener('pointercancel', (ev) => {
+    try { canvas.releasePointerCapture(ev.pointerId); } catch (e) {}
+    pointers.delete(ev.pointerId);
+    if (isPinching && pointers.size < 2) endPinch();
+  });
+
+  // wheel for desktop zooming
+  canvas.addEventListener('wheel', (ev) => {
+    if (!placedObject) return;
+    ev.preventDefault();
+    const delta = ev.deltaY;
+    const scaleFactor = delta > 0 ? 0.95 : 1.05;
+    let newScale = placedObject.scale.x * scaleFactor;
+    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+    placedObject.scale.setScalar(newScale);
+  }, { passive: false });
+  // ----------------------------------------------------
 
   console.log('index.js loaded. Ready.');
 }
@@ -584,6 +672,17 @@ function swapModelForHealthAfterDelay(healthKey) {
     return;
   }
 
+  // preserve previous uniform scale if exists
+  let prevScaleScalar = BASE_SCALE;
+  if (placedObject) {
+    try {
+      prevScaleScalar = placedObject.scale.x || BASE_SCALE;
+    } catch (e) { prevScaleScalar = BASE_SCALE; }
+  } else {
+    // if not placed yet, fallback to BASE_SCALE
+    prevScaleScalar = BASE_SCALE;
+  }
+
   const pos = new THREE.Vector3();
   const quat = new THREE.Quaternion();
   const scl = new THREE.Vector3();
@@ -616,7 +715,7 @@ function swapModelForHealthAfterDelay(healthKey) {
       const newModel = cloneSceneWithClips(cachedEntry);
       newModel.position.copy(pos);
       newModel.quaternion.copy(quat);
-      newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
+      newModel.scale.set(prevScaleScalar, prevScaleScalar, prevScaleScalar);
       newModel.userData.modelFile = modelFile;
       applyMeshMaterialTweaks(newModel);
       scene.add(newModel);
@@ -640,7 +739,7 @@ function swapModelForHealthAfterDelay(healthKey) {
         if (!newModel) { console.error('GLTF has no scene:', modelFile); return; }
         newModel.position.copy(pos);
         newModel.quaternion.copy(quat);
-        newModel.scale.set(BASE_SCALE, BASE_SCALE, BASE_SCALE);
+        newModel.scale.set(prevScaleScalar, prevScaleScalar, prevScaleScalar);
         newModel.userData.modelFile = modelFile;
         applyMeshMaterialTweaks(newModel);
         scene.add(newModel);
