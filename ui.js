@@ -14,6 +14,8 @@
   const odontogramBtn = document.getElementById('odontogramBtn');
   const odontogramPopup = document.getElementById('odontogramPopup');
   const closePopup = document.getElementById('closePopup');
+  const popupOdontogramImage = document.getElementById('popupOdontogramImage');
+  const popupOdontogramText = document.getElementById('popupOdontogramText');
 
   const barsContainer = document.getElementById('bars');
   const buttonsContainer = document.getElementById('buttons');
@@ -86,6 +88,50 @@
     });
   }
 
+  // NEW: Function to update popup odontogram based on health key
+  function updatePopupOdontogram(healthKey = null) {
+    if (!popupOdontogramImage || !popupOdontogramText) return;
+
+    let imageSrc = '';
+    let description = '';
+
+    if (!toothReady || healthKey === null) {
+      // No tooth placed
+      imageSrc = 'odontogram/odontogram_hilang.png';
+      description = 'Gigi Hilang: Gigi tidak ada/tanggal';
+    } else {
+      // Update based on health key
+      switch(healthKey) {
+        case 100: // gigisehat.glb
+          imageSrc = 'odontogram/odontogram_normal.png';
+          description = 'Gigi Normal: Gigi sehat tanpa masalah';
+          break;
+        case 75: // gigiplak.glb
+          imageSrc = 'odontogram/odontogram_normal.png';
+          description = 'Gigi Normal: Gigi sehat tanpa masalah';
+          break;
+        case 50: // gigiasam.glb
+          imageSrc = 'odontogram/odontogram_karang.png';
+          description = 'Gigi Bermasalah: Ada karang gigi atau plak';
+          break;
+        case 25: // gigidemineralisasi.glb
+          imageSrc = 'odontogram/odontogram_karang.png';
+          description = 'Gigi Bermasalah: Ada karang gigi atau plak';
+          break;
+        case 0: // gigikaries.glb
+          imageSrc = 'odontogram/odontogram_karies.png';
+          description = 'Gigi Karies: Gigi berlubang/rusak';
+          break;
+        default:
+          imageSrc = 'odontogram/odontogram_hilang.png';
+          description = 'Gigi Hilang: Gigi tidak ada/tanggal';
+      }
+    }
+
+    popupOdontogramImage.src = imageSrc;
+    popupOdontogramText.textContent = description;
+  }
+
   // NEW: Odontogram button click handler
   if (odontogramBtn) {
     odontogramBtn.addEventListener('click', () => {
@@ -93,6 +139,11 @@
         fadeInfo("Fitur ini hanya tersedia saat berada di AR.");
         return;
       }
+      
+      // Update popup content based on current health
+      const healthKey = getHealthKeyFromValue(healthValue);
+      updatePopupOdontogram(healthKey);
+      
       odontogramPopup.classList.remove('hidden');
     });
   }
@@ -335,6 +386,15 @@
     if (typeof d.clean === 'number') cleanValue = d.clean;
     updateBars();
   });
+
+  // NEW: Helper function to convert health value to health key
+  function getHealthKeyFromValue(health) {
+    if (health >= 100) return 100;
+    if (health >= 75) return 75;
+    if (health >= 50) return 50;
+    if (health >= 25) return 25;
+    return 0;
+  }
 
   // apply the "game logic" to UI values AFTER animations finish (called by interactor-finished)
   function performActionEffect(action) {

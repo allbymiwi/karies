@@ -306,7 +306,7 @@ canvas {
   background: white;
   padding: 30px;
   border-radius: 20px;
-  max-width: 500px;
+  max-width: 400px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
@@ -322,6 +322,17 @@ canvas {
   font-size: 24px;
   cursor: pointer;
   color: #666;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.close-btn:hover {
+  background-color: #f0f0f0;
 }
 
 .popup h3 {
@@ -331,30 +342,27 @@ canvas {
   margin-bottom: 20px;
 }
 
-.odontogram-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.odontogram-item {
+.odontogram-single {
   text-align: center;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 10px;
+  padding: 20px;
 }
 
-.odontogram-item img {
-  width: 60px;
-  height: 60px;
+.odontogram-single img {
+  width: 120px;
+  height: 120px;
   object-fit: contain;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.odontogram-item p {
+.odontogram-single p {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   color: #333;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 /* show AR-only controls */
