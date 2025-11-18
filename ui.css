@@ -1,5 +1,4 @@
-/* ui.css - cleaned (with reset/exit buttons moved to top center + scale buttons)
-   Controls (extraButtons & scaleButtons) are hidden by default and shown when AR starts */
+/* ui.css - cleaned (with reset/exit buttons moved to top center) */
 body {
   margin: 0;
   overflow: hidden;
@@ -86,50 +85,6 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
 .action-btn.healthy img { background:#c8f7c2; }
 .action-btn.sweet img { background:#ffd4e1; }
 
-/* SCALE BUTTONS (Perbesar & Perkecil) */
-#scaleButtons {
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  margin-bottom: 40px; /* posisi persis di bawah 3 tombol aksi */
-  pointer-events: auto; /* overridden when hidden by class */
-  z-index: 45;
-}
-
-.scale-btn {
-  padding: 10px 20px;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  color: #fff;
-  background: linear-gradient(180deg, #444, #222);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-  transition: transform 0.15s ease, opacity 0.2s ease, transform 120ms ease;
-}
-
-.scale-btn:active {
-  transform: scale(0.94);
-}
-
-/* Initially hide controls that should appear only in AR */
-#scaleButtons,
-#extraButtons {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-/* When in AR we add this class to show them */
-.visible-controls {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  transform: translateX(-50%) translateY(0) !important;
-}
-
 /* info text */
 #infoText {
   background: rgba(255,255,255,0.95);
@@ -157,11 +112,11 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   padding: 8px 14px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(180deg, #444, #222);
+  background: linear-gradient(180deg,#3c86ff,#0b66ff);
   color: #fff;
   font-weight:700;
   cursor:pointer;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  box-shadow: 0 6px 18px rgba(11,102,255,0.25);
   transition: opacity 0.28s ease, transform 0.18s ease;
 }
 
@@ -171,16 +126,44 @@ canvas { display:block; width:100vw; height:100vh; position: absolute; }
   transform: translateX(-50%) scale(0.96);
 }
 
+/* Scale Buttons (center bottom) */
+#scaleButtons {
+  position: absolute;
+  bottom: 35px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20px;
+  z-index: 60;
+  pointer-events: auto;
+}
+
+.scale-btn {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, #444, #222);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  transition: transform 0.15s ease;
+}
+
+.scale-btn:active {
+  transform: scale(0.94);
+}
+
 /* Extra Buttons (Reset & Exit) – moved to top center */
 #extraButtons {
   position: absolute;
-  top: 85px; /* below Enter AR button */
+  top: 90px; /* below Enter AR button */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 16px;
   z-index: 65;
-  pointer-events: auto; /* overridden when hidden by class */
+  pointer-events: auto;
 }
 
 .extra-btn {
