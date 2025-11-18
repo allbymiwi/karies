@@ -829,10 +829,8 @@ function onSelect() {
     reticle.visible = false;
     window.dispatchEvent(new CustomEvent('model-placed', { detail: newModel }));
     
-    // PERBAIKAN: Set info text yang benar setelah model placed
-    if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
-      window.kariesUI.fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
-    }
+    // PERBAIKAN: HANYA dispatch event model-placed, biar UI yang handle text info
+    // JANGAN panggil fadeInfo atau getHealthStateMessage di sini
     
     // NEW: Trigger health-changed to update tooth status to initial state
     window.dispatchEvent(new CustomEvent('health-changed', { 
@@ -856,10 +854,8 @@ function onSelect() {
     reticle.visible = false;
     window.dispatchEvent(new CustomEvent('model-placed', { detail: model }));
     
-    // PERBAIKAN: Set info text yang benar setelah model placed
-    if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
-      window.kariesUI.fadeInfo("Model gigi siap! Pilih aksi di bawah ini.");
-    }
+    // PERBAIKAN: HANYA dispatch event model-placed, biar UI yang handle text info
+    // JANGAN panggil fadeInfo atau getHealthStateMessage di sini
     
     // NEW: Trigger health-changed to update tooth status to initial state
     window.dispatchEvent(new CustomEvent('health-changed', { 
