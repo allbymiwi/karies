@@ -154,29 +154,32 @@
   function performActionEffect(action) {
     switch(action) {
       case 'brush':
+        // brush restores both cleanliness and health; also resets counters
         cleanValue = clamp100(cleanValue + 25);
         healthValue = clamp100(healthValue + 25);
-        sweetCount = 0; healthyCount = 0;
+        sweetCount = 0;
+        healthyCount = 0;
         fadeInfo("🪥 Menggosok gigi: Kebersihan +25%, Kesehatan +25%");
         break;
       case 'sweet':
-        // FIRST: update counters and apply any health penalty (so health changes show first)
+        // increment sweet counter first
         sweetCount++;
+
+        // If this action triggers a health penalty (e.g. second sweet), apply health penalty FIRST
+        // and DO NOT reduce cleanliness for that triggering hit — user wanted health to drop first.
         if (sweetCount >= 2) {
           sweetCount = 0;
-          // apply health penalty first so UI shows health change before cleanliness reduction
           healthValue = clamp100(healthValue - 25);
-          // then also decrease cleanliness
-          cleanValue = clamp100(cleanValue - 12.5);
+          // NOTE: we intentionally do NOT immediately lower cleanValue here so UI shows health change first.
           fadeInfo("🍭 Terlalu sering makan manis — kesehatan turun 25%!");
         } else {
-          // single sweet: still reduce cleanliness but health untouched
+          // single sweet: reduce cleanliness slightly only
           cleanValue = clamp100(cleanValue - 12.5);
           fadeInfo("🍭 Gula menempel — kebersihan sedikit menurun.");
         }
         break;
       case 'healthy':
-        // Keep existing healthy logic but apply cleanliness first, then health bump when threshold reached
+        // healthy food increases cleanliness; after enough times it raises health
         cleanValue = clamp100(cleanValue + 12.5);
         healthyCount++;
         if (healthyCount >= 2) {
