@@ -108,15 +108,15 @@
           break;
         case 75: // gigiplak.glb
           imageSrc = 'odontogram/odontogram_normal.png';
-          description = 'Gigi Normal: Gigi sehat tanpa masalah';
+          description = 'Gigi Normal: Sedikit ada plak menempel';
           break;
         case 50: // gigiasam.glb
           imageSrc = 'odontogram/odontogram_karang.png';
-          description = 'Gigi Bermasalah: Ada karang gigi atau plak';
+          description = 'Gigi Bermasalah: Karang gigi mulai muncul';
           break;
         case 25: // gigidemineralisasi.glb
           imageSrc = 'odontogram/odontogram_karang.png';
-          description = 'Gigi Bermasalah: Ada karang gigi atau plak';
+          description = 'Gigi Bermasalah: Ada karang gigi';
           break;
         case 0: // gigikaries.glb
           imageSrc = 'odontogram/odontogram_karies.png';
@@ -332,7 +332,7 @@
     // check terminal condition
     if (cleanValue <= 0 && healthValue <= 0) {
       setButtonsEnabled(false);
-      fadeInfo("⚠️ Gigi sudah rusak parah — struktur rusak. Perawatan akhir diperlukan (di dunia nyata).");
+      fadeInfo("⚠️ Gigi sudah rusak parah dan menimbulkan infeksi. Segera konsultasi ke dokter gigi! (Tekan RESET untuk memulai ulang).");
     } else {
       setButtonsEnabled(true);
     }

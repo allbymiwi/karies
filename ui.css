@@ -308,7 +308,7 @@ canvas {
   padding: 30px;
   border-radius: 20px;
   width: 320px; /* Diperkecil dan dibuat sama panjang x lebarnya */
-  height: 320px; /* Diperkecil dan dibuat sama panjang x lebarnya */
+  height: 450px; /* Diperkecil dan dibuat sama panjang x lebarnya */
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
@@ -361,8 +361,8 @@ canvas {
 }
 
 .odontogram-single img {
-  width: 280px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
-  height: 280px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
+  width: 300px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
+  height: 300px; /* Diperkecil agar sesuai dengan popup yang lebih kecil */
   object-fit: contain;
   margin-bottom: 15px;
 }
