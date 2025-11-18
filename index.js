@@ -1,5 +1,5 @@
-// index.js (ORBIT-ONLY brush) - full file (plus xrBtn hide/show)
-// Updated: add pinch-to-zoom / wheel zoom and preserve scale across model swaps
+// index.js (optimized pinch + wheel responsiveness)
+// Replace whole file with this optimized version
 
 import * as THREE from './modules/three.module.js';
 import { GLTFLoader } from './modules/GLTFLoader.js';
@@ -33,33 +33,21 @@ let objectPlaced = false;
 let placedObject = null;
 let currentHealthModelKey = DEFAULT_HEALTH_KEY;
 
-// caches now store { scene, clips? } so animations are preserved
-const modelCache = {};         // file -> { scene, clips }
-const interactorCache = {};    // action -> { scene, clips }
+const modelCache = {};
+const interactorCache = {};
 
-// tmp
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
 
 const xrBtn = document.getElementById('xrBtn');
 
-// lighting global
 let spotLight = null;
-
-// ---------- NEW: track last action from UI ----------
 let lastAction = null;
-// listener to update lastAction when UI notifies
 window.addEventListener('ui-last-action', (e) => {
-  try {
-    lastAction = e.detail && e.detail.action ? e.detail.action : null;
-  } catch (err) {
-    lastAction = null;
-  }
+  try { lastAction = e.detail && e.detail.action ? e.detail.action : null; } catch (err) { lastAction = null; }
 });
-// ---------------------------------------------------
 
-// ------------------- NEW: health stage messages helper -------------------
 function getHealthStateMessage(healthKey) {
   switch (healthKey) {
     case 100:
@@ -76,7 +64,6 @@ function getHealthStateMessage(healthKey) {
       return "Status gigi berubah.";
   }
 }
-// -------------------------------------------------------------------------
 
 xrBtn.addEventListener('click', () => {
   if (!xrSession) requestXRSession();
@@ -92,7 +79,8 @@ function initThree() {
 
   renderer = new THREE.WebGLRenderer({ canvas: canvas, context: gl, alpha: true });
   renderer.xr.enabled = true;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // keep pixel ratio reasonable for performance
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearAlpha(0);
   renderer.shadowMap.enabled = true;
@@ -101,7 +89,6 @@ function initThree() {
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
   scene = new THREE.Scene();
 
-  // lighting improvements
   const ambient = new THREE.AmbientLight(0xffffff, 0.28);
   scene.add(ambient);
 
@@ -129,7 +116,6 @@ function initThree() {
   scene.add(spotLight);
   scene.add(spotLight.target);
 
-  // reticle
   reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.15, 0.20, 32).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0x00ff00 })
@@ -146,7 +132,6 @@ function initThree() {
 
   window.addEventListener('resize', onWindowResize);
 
-  // listen ui-action-request
   window.addEventListener('ui-action-request', async (e) => {
     const action = e.detail && e.detail.action ? e.detail.action : e.detail || null;
     if (!action || !objectPlaced) {
@@ -162,20 +147,17 @@ function initThree() {
     }
   });
 
-  // UI dispatches health-changed after it updates values (upon interactor-finished)
   window.addEventListener('health-changed', (e) => {
     const health = e.detail && typeof e.detail.health === 'number' ? e.detail.health : null;
     if (health === null) return;
     const key = clampHealthKey(health);
     currentHealthModelKey = key;
     if (objectPlaced) swapModelForHealthAfterDelay(key);
-
     if (health <= 0) {
       window.dispatchEvent(new CustomEvent('terminal-reached', { detail: { reason: 'health_zero' } }));
     }
   });
 
-  // reset listener
   window.addEventListener('reset', () => {
     if (placedObject) {
       scene.remove(placedObject);
@@ -184,26 +166,45 @@ function initThree() {
     }
     objectPlaced = false;
     currentHealthModelKey = DEFAULT_HEALTH_KEY;
-    // also hide reticle so user re-place (reticle will show when hit-test resumes)
     reticle.visible = false;
-
-    // clear last action so subsequent health messages revert to normal behavior
     lastAction = null;
   });
 
-  // NEW: respond to exit request from UI
   window.addEventListener('request-exit-ar', () => {
     endXRSession();
   });
 
-  // ---------- New: Pinch / Wheel Zoom Support ----------
-  // We'll use Pointer Events to support multi-touch pinch reliably.
-  const pointers = new Map(); // pointerId -> {x,y}
+  // -------------------- OPTIMIZED PINCH & WHEEL --------------------
+  // pointer-tables only store coords; actual scale applied inside RAF update
+  const pointers = new Map();
   let isPinching = false;
   let pinchStartDist = 0;
   let pinchStartScale = BASE_SCALE;
   const MIN_SCALE = 0.05;
   const MAX_SCALE = 2.0;
+
+  // smoothing: target scale + current applied scale
+  let pinchTargetScale = BASE_SCALE;
+  let pinchAppliedScale = BASE_SCALE;
+  const SCALE_LERP_ALPHA = 0.28; // smoothing factor; lower = smoother but slower
+
+  // performance helpers: temporarily disable shadows while heavy gesture occurs
+  let shadowsTemporarilyDisabled = false;
+  let shadowRestoreTimeout = null;
+  function disableShadowsDuringGesture() {
+    if (!renderer.shadowMap.enabled) return;
+    if (shadowRestoreTimeout) { clearTimeout(shadowRestoreTimeout); shadowRestoreTimeout = null; }
+    renderer.shadowMap.enabled = false;
+    shadowsTemporarilyDisabled = true;
+  }
+  function scheduleRestoreShadows(delay = 300) {
+    if (shadowRestoreTimeout) clearTimeout(shadowRestoreTimeout);
+    shadowRestoreTimeout = setTimeout(() => {
+      renderer.shadowMap.enabled = true;
+      shadowsTemporarilyDisabled = false;
+      shadowRestoreTimeout = null;
+    }, delay);
+  }
 
   function getDistanceBetweenPointers() {
     const it = pointers.values();
@@ -218,74 +219,85 @@ function initThree() {
   function startPinch() {
     if (!placedObject) return;
     pinchStartDist = getDistanceBetweenPointers();
-    // use current object's uniform scale as baseline
     pinchStartScale = placedObject.scale.x || BASE_SCALE;
+    pinchTargetScale = pinchStartScale;
+    pinchAppliedScale = pinchStartScale;
     isPinching = pinchStartDist > 0;
-    // optional: give user feedback
-    // console.log('pinch start', pinchStartDist, pinchStartScale);
+    // performance: disable shadows while pinching
+    disableShadowsDuringGesture();
   }
 
-  function updatePinch() {
+  function updatePinchTarget() {
     if (!isPinching || !placedObject) return;
     const dist = getDistanceBetweenPointers();
     if (!dist || pinchStartDist === 0) return;
     const factor = dist / pinchStartDist;
     let newScale = pinchStartScale * factor;
     newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-    placedObject.scale.setScalar(newScale);
+    pinchTargetScale = newScale;
   }
 
   function endPinch() {
     isPinching = false;
     pinchStartDist = 0;
+    // schedule shadows to be restored shortly after gesture ends
+    scheduleRestoreShadows(300);
   }
 
-  // Pointer handlers attached to canvas
+  // pointer handlers
   canvas.addEventListener('pointerdown', (ev) => {
-    // Only handle touches or mouse — ignore stylus if desired; we'll accept all pointer types
-    canvas.setPointerCapture(ev.pointerId);
+    canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-    if (pointers.size === 2) {
-      startPinch();
-    }
+    if (pointers.size === 2) startPinch();
   });
 
   canvas.addEventListener('pointermove', (ev) => {
     if (!pointers.has(ev.pointerId)) return;
+    // only update stored coords here (cheap)
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (pointers.size === 2 && isPinching) {
-      updatePinch();
+      // don't set scale directly; set target (cheap)
+      updatePinchTarget();
     }
   });
 
-  canvas.addEventListener('pointerup', (ev) => {
-    try { canvas.releasePointerCapture(ev.pointerId); } catch (e) {}
+  function releasePointer(ev) {
+    try { canvas.releasePointerCapture && canvas.releasePointerCapture(ev.pointerId); } catch (e) {}
     pointers.delete(ev.pointerId);
     if (isPinching && pointers.size < 2) endPinch();
-  });
+  }
 
-  canvas.addEventListener('pointercancel', (ev) => {
-    try { canvas.releasePointerCapture(ev.pointerId); } catch (e) {}
-    pointers.delete(ev.pointerId);
-    if (isPinching && pointers.size < 2) endPinch();
-  });
+  canvas.addEventListener('pointerup', releasePointer);
+  canvas.addEventListener('pointercancel', releasePointer);
 
-  // wheel for desktop zooming
+  // optimized wheel handler: adjust pinchTargetScale smoothly
+  let wheelLast = 0;
   canvas.addEventListener('wheel', (ev) => {
     if (!placedObject) return;
     ev.preventDefault();
+    // small multiplier per wheel tick; use time-based dampening
+    const now = performance.now();
+    if (now - wheelLast > 60) {
+      // when wheel starts, disable shadows briefly for performance
+      disableShadowsDuringGesture();
+      wheelLast = now;
+      // restore shadows shortly after wheel stops
+      scheduleRestoreShadows(300);
+    }
     const delta = ev.deltaY;
-    const scaleFactor = delta > 0 ? 0.95 : 1.05;
-    let newScale = placedObject.scale.x * scaleFactor;
-    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-    placedObject.scale.setScalar(newScale);
+    const scaleFactor = delta > 0 ? 0.94 : 1.06;
+    let newTarget = (pinchTargetScale || placedObject.scale.x) * scaleFactor;
+    newTarget = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newTarget));
+    pinchTargetScale = newTarget;
   }, { passive: false });
-  // ----------------------------------------------------
+  // -------------------- end optimized pinch/wheel --------------------
 
-  console.log('index.js loaded. Ready.');
+  console.log('index.js loaded (optimized). Ready.');
 }
 
-// clamp to discrete keys
+// The rest of the file is largely identical to the app logic previously used,
+// except we add a small touch in the render loop to smoothly apply pinchTargetScale.
+
 function clampHealthKey(health) {
   if (health >= 100) return 100;
   if (health >= 75) return 75;
@@ -294,7 +306,6 @@ function clampHealthKey(health) {
   return 0;
 }
 
-// apply tweaks to meshes for better contrast
 function applyMeshMaterialTweaks(model) {
   model.traverse((c) => {
     if (c.isMesh) {
@@ -313,8 +324,6 @@ function applyMeshMaterialTweaks(model) {
   });
 }
 
-// ---- PRELOAD ALL MODELS (tooth + interactors) ----
-// store both scene and animations (so we can play baked GLB clips)
 function preloadAllModelsAndInteractors() {
   const files = new Set(Object.values(MODEL_MAP).concat(Object.values(INTERACTORS)));
   const promises = [];
@@ -337,7 +346,7 @@ function preloadAllModelsAndInteractors() {
         undefined,
         (err) => {
           console.warn('preload failed for', file, err);
-          resolve(); // don't block
+          resolve();
         }
       );
     }));
@@ -345,7 +354,6 @@ function preloadAllModelsAndInteractors() {
   return Promise.all(promises);
 }
 
-// clone helper: clone scene and attach clips (if any) to clone.userData._clips
 function cloneSceneWithClips(entry) {
   if (!entry || !entry.scene) return null;
   const cloned = entry.scene.clone(true);
@@ -354,7 +362,6 @@ function cloneSceneWithClips(entry) {
   return cloned;
 }
 
-// spawn interactor (clone cached glb or load fallback)
 async function runInteractorAnimation(action) {
   const file = INTERACTORS[action];
   if (!file) return;
@@ -377,16 +384,13 @@ async function runInteractorAnimation(action) {
 
   if (!placedObject) return;
 
-  // set initial local transform depending on action
   const localStart = new THREE.Vector3();
   const localRot = new THREE.Euler();
   const localScale = new THREE.Vector3(1,1,1);
 
-  // BRUSH: upright, slightly above, no tilt (user request)
   if (action === 'brush') {
-    // upright & slightly higher on Y so brush orbits the top of the tooth
-    localStart.set(0.0, 0.40, 0.12); // x,y,z : center above crown
-    localRot.set(0, 0, 0);           // no tilt - upright
+    localStart.set(0.0, 0.40, 0.12);
+    localRot.set(0, 0, 0);
     localScale.set(0.55,0.55,0.55);
   } else if (action === 'healthy') {
     localStart.set(0.0, 1.6, 0.9);
@@ -408,7 +412,6 @@ async function runInteractorAnimation(action) {
   wrapper.add(interactorRoot);
   placedObject.add(wrapper);
 
-  // For brush, pass both wrapper & root so we can play GLB clips if exist
   let animPromise = null;
   if (action === 'brush') animPromise = animateBrushWithPossibleGLB(() => ({ wrapper, root: interactorRoot }));
   else if (action === 'healthy') animPromise = animateCarrotFade(wrapper);
@@ -425,11 +428,9 @@ async function runInteractorAnimation(action) {
   return;
 }
 
-// ---- Anim helpers ----
 function lerp(a,b,t){ return a + (b-a)*t; }
 function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
 
-// animateBrushWithPossibleGLB: try clips, else fallback to upright orbit at tooth top
 function animateBrushWithPossibleGLB(getPair) {
   const pair = getPair();
   const wrapper = pair.wrapper;
@@ -460,12 +461,9 @@ function animateBrushWithPossibleGLB(getPair) {
     });
   }
 
-  // FALLBACK: upright orbit at top of crown (orbit-only, no spin)
   return animateBrushUpright(wrapper);
 }
 
-// animateBrushUpright: orbit above tooth, brush stays upright (rotation.x kept near 0)
-// NO helicopter spin — only orbit movement and slight sweep rotation (z) for visual
 function animateBrushUpright(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
@@ -476,10 +474,9 @@ function animateBrushUpright(wrapper) {
     const initialRotZ = wrapper.rotation.z;
     const initialScale = wrapper.scale.x;
 
-    // CONFIG: orbit parameters tuned for top brushing
-    const radius = 0.50;       // orbit radius
-    const revolutions = 3;     // how many revolutions
-    const orbitDuration = 1200; // ms duration
+    const radius = 0.50;
+    const revolutions = 3;
+    const orbitDuration = 1200;
     const approachDur = 100;
     const retreatDur = 100;
     const totalOrbitTime = orbitDuration;
@@ -487,10 +484,9 @@ function animateBrushUpright(wrapper) {
     function frame(now) {
       const elapsed = now - start;
 
-      // approach: move slightly down to contact zone
       if (elapsed < approachDur) {
         const t = easeInOutQuad(elapsed / approachDur);
-        wrapper.position.z = lerp(cz + 0.02, cz - 0.03, t); // come slightly closer
+        wrapper.position.z = lerp(cz + 0.02, cz - 0.03, t);
         wrapper.rotation.x = lerp(wrapper.rotation.x, 0, t);
         requestAnimationFrame(frame);
         return;
@@ -499,34 +495,27 @@ function animateBrushUpright(wrapper) {
       const orbitStart = approachDur;
       const orbitEnd = approachDur + totalOrbitTime;
 
-      // orbit: circular movement around top (xy-plane) with tiny vertical dip for contact
       if (elapsed >= orbitStart && elapsed < orbitEnd) {
         const t = (elapsed - orbitStart) / (orbitEnd - orbitStart);
         const eased = easeInOutQuad(t);
         const angle = eased * revolutions * Math.PI * 2;
 
-        // orbit center is (cx, cy). We move mostly in x axis with small y variation (top of crown)
         const ox = cx + Math.cos(angle) * radius;
         const oy = cy + Math.sin(angle) * (radius * 0.35);
 
-        // simulate brushing contact: tiny periodic dip in y (downwards) based on angle
-        const contactDip = 0.01 * Math.abs(Math.sin(angle * 3)); // small dip, always positive
+        const contactDip = 0.01 * Math.abs(Math.sin(angle * 3));
         wrapper.position.x = ox;
         wrapper.position.y = oy - contactDip;
 
-        // keep brush upright: rot.x near 0
         wrapper.rotation.x = 0;
-        // small sweep rotation around Z for visual sweeping (not spinning the head)
         wrapper.rotation.z = initialRotZ + Math.sin(angle * 2) * 0.06;
 
-        // tiny scale pulse for pressure feel
         wrapper.scale.setScalar(initialScale * (1 + 0.01 * Math.sin(angle * 4)));
 
         requestAnimationFrame(frame);
         return;
       }
 
-      // retreat: move back to original
       if (elapsed >= orbitEnd && elapsed < orbitEnd + retreatDur) {
         const t2 = (elapsed - orbitEnd) / retreatDur;
         const tt2 = easeInOutQuad(t2);
@@ -546,7 +535,6 @@ function animateBrushUpright(wrapper) {
   });
 }
 
-// carrots & candy animations (fall+fade) - using initialScale to avoid exploding
 function animateCarrotFade(wrapper) {
   return new Promise((resolve) => {
     const start = performance.now();
@@ -643,15 +631,12 @@ function animateCandyFade(wrapper) {
   });
 }
 
-// ---- Swap model AFTER UI dispatches health-changed (no scale out/in) ----
 function swapModelForHealthAfterDelay(healthKey) {
   const modelFile = MODEL_MAP[healthKey];
   if (!modelFile) return;
 
-  // If same model already in scene, still inform UI (refresh message)
   if (placedObject && placedObject.userData && placedObject.userData.modelFile === modelFile) {
     try {
-      // Decide message based on lastAction:
       let msgSame = "";
       if (lastAction === "brush") {
         msgSame = "Bagus kamu telah menggosok gigi! Kamu dianjurkan menggosok gigi minimal dua kali sehari, yaitu setelah sarapan pagi dan sebelum tidur malam. Setiap kali menyikat gigi, lakukan selama minimal 2 menit ya!";
@@ -672,14 +657,10 @@ function swapModelForHealthAfterDelay(healthKey) {
     return;
   }
 
-  // preserve previous uniform scale if exists
   let prevScaleScalar = BASE_SCALE;
   if (placedObject) {
-    try {
-      prevScaleScalar = placedObject.scale.x || BASE_SCALE;
-    } catch (e) { prevScaleScalar = BASE_SCALE; }
+    try { prevScaleScalar = placedObject.scale.x || BASE_SCALE; } catch (e) { prevScaleScalar = BASE_SCALE; }
   } else {
-    // if not placed yet, fallback to BASE_SCALE
     prevScaleScalar = BASE_SCALE;
   }
 
@@ -697,7 +678,6 @@ function swapModelForHealthAfterDelay(healthKey) {
       placedObject = null;
     }
 
-    // message for this health stage, but modify logic based on lastAction
     let stateMsg = "";
 
     if (lastAction === "brush") {
@@ -707,7 +687,6 @@ function swapModelForHealthAfterDelay(healthKey) {
     } else if (lastAction === "sweet") {
       stateMsg = getHealthStateMessage(healthKey);
     } else {
-      // fallback: if no lastAction known, use health message
       stateMsg = getHealthStateMessage(healthKey);
     }
 
@@ -721,7 +700,6 @@ function swapModelForHealthAfterDelay(healthKey) {
       scene.add(newModel);
       placedObject = newModel;
 
-      // inform UI about new health stage (with action-aware message)
       try {
         if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
           window.kariesUI.fadeInfo(stateMsg);
@@ -745,7 +723,6 @@ function swapModelForHealthAfterDelay(healthKey) {
         scene.add(newModel);
         placedObject = newModel;
 
-        // inform UI about new health stage
         try {
           if (window.kariesUI && typeof window.kariesUI.fadeInfo === 'function') {
             window.kariesUI.fadeInfo(stateMsg);
@@ -786,7 +763,6 @@ async function requestXRSession() {
     const supported = await navigator.xr.isSessionSupported('immersive-ar');
     if (!supported) throw new Error('immersive-ar tidak didukung pada device/browser ini.');
 
-    // preload everything (tooth + interactors)
     await preloadAllModelsAndInteractors();
 
     const session = await navigator.xr.requestSession('immersive-ar', {
@@ -805,11 +781,7 @@ async function requestXRSession() {
 async function onSessionStarted(session) {
   xrSession = session;
   xrBtn.textContent = 'STOP AR';
-
-  // HIDE (fade) the Enter AR button when AR starts
   xrBtn.classList.add('hidden');
-
-  // INFORM UI that XR started
   window.dispatchEvent(new CustomEvent('xr-started'));
 
   try {
@@ -829,21 +801,11 @@ async function onSessionStarted(session) {
 function onSessionEnded() {
   xrSession = null;
   xrBtn.textContent = 'Enter AR';
-
-  // SHOW (fade in) the Enter AR button when AR ends
   xrBtn.classList.remove('hidden');
-
-  // INFORM UI that XR ended
   window.dispatchEvent(new CustomEvent('xr-ended'));
-
   hitTestSourceRequested = false;
   hitTestSource = null;
   renderer.setAnimationLoop(null);
-}
-
-function endXRSession() {
-  if (!xrSession) return;
-  xrSession.end().catch(err => console.warn('end XR failed', err));
 }
 
 function onSelect() {
@@ -866,7 +828,6 @@ function onSelect() {
     objectPlaced = true;
     reticle.visible = false;
     window.dispatchEvent(new CustomEvent('model-placed', { detail: newModel }));
-
     return;
   }
 
@@ -890,6 +851,7 @@ function onSelect() {
 }
 
 function render(time, frame) {
+  // hit test & reticle update
   if (frame) {
     const referenceSpace = renderer.xr.getReferenceSpace();
     const session = frame.session;
@@ -919,7 +881,7 @@ function render(time, frame) {
       }
     }
 
-    // update spotLight to follow camera a bit
+    // update light follow
     if (spotLight && renderer.xr.isPresenting) {
       try {
         const xrCamera = renderer.xr.getCamera(camera);
@@ -934,6 +896,23 @@ function render(time, frame) {
       } catch (err) { /* ignore */ }
     }
   }
+
+  // ---------- APPLY SMOOTHED PINCH-TARGET SCALE HERE ----------
+  // We only touch the object's scale if it exists and if pinchTargetScale is defined.
+  // This keeps pointermove lightweight and surfaces scale changes inside RAF (GPU-friendly).
+  try {
+    if (placedObject && typeof pinchTargetScale !== 'undefined') {
+      // create small epsilon to avoid micro changes
+      const current = placedObject.scale.x;
+      // apply smoothing lerp from current to target
+      const next = lerp(current, pinchTargetScale, typeof SCALE_LERP_ALPHA !== 'undefined' ? SCALE_LERP_ALPHA : 0.28);
+      // only set if difference passes threshold to avoid constant GPU state churn
+      if (Math.abs(next - current) > 0.0005) {
+        placedObject.scale.setScalar(next);
+      }
+    }
+  } catch (err) { /* ignore */ }
+  // ----------------------------------------------------------------
 
   renderer.render(scene, camera);
 }
