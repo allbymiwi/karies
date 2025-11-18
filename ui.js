@@ -1,4 +1,4 @@
-/* ui.js - clean UI wiring (no reset, no extra buttons) */
+/* ui.js - clean UI wiring (controls visible only in AR) */
 (() => {
   const info = document.getElementById('infoText');
   const cleanFill = document.getElementById('cleanFill');
@@ -14,6 +14,10 @@
   const scaleUpBtn = document.getElementById('scaleUpBtn');
   const scaleDownBtn = document.getElementById('scaleDownBtn');
 
+  // containers (to toggle visibility)
+  const extraButtonsContainer = document.getElementById('extraButtons');
+  const scaleButtonsContainer = document.getElementById('scaleButtons');
+
   let toothReady = false;
   let cleanValue = 100;
   let healthValue = 100;
@@ -22,7 +26,10 @@
   let sweetCount = 0;
   let healthyCount = 0;
 
-  // initially buttons disabled until model placed
+  // track whether currently in XR session
+  let inXR = false;
+
+  // initially buttons disabled until model placed; extra/scale hidden (CSS handles hidden by default)
   function setButtonsEnabled(enabled) {
     buttons.forEach(b => {
       b.style.opacity = enabled ? '1' : '0.55';
@@ -30,7 +37,7 @@
       b.tabIndex = enabled ? 0 : -1;
       if (enabled) b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled', 'true');
     });
-    // scale buttons follow action-buttons (only usable when model placed)
+    // scale buttons mirror action-buttons (only usable when model placed)
     if (scaleUpBtn) {
       scaleUpBtn.style.opacity = enabled ? '1' : '0.55';
       scaleUpBtn.style.pointerEvents = enabled ? 'auto' : 'none';
@@ -44,19 +51,35 @@
       if (enabled) scaleDownBtn.removeAttribute('aria-disabled'); else scaleDownBtn.setAttribute('aria-disabled', 'true');
     }
 
-    // extra buttons (reset/exit) remain interactive even when action buttons are disabled
-    if (resetBtn) {
-      resetBtn.style.opacity = '1';
-      resetBtn.style.pointerEvents = 'auto';
-      resetBtn.tabIndex = 0;
-    }
-    if (exitBtn) {
-      exitBtn.style.opacity = '1';
-      exitBtn.style.pointerEvents = 'auto';
-      exitBtn.tabIndex = 0;
-    }
+    // NOTE: Reset / Exit visibility & interactivity are controlled by inXR + CSS class.
+    // Do NOT force them here; they become interactive when inXR === true and container has .visible-controls.
   }
   setButtonsEnabled(false);
+
+  // helpers to show/hide AR-only controls
+  function showARControls(show) {
+    inXR = !!show;
+    if (show) {
+      if (extraButtonsContainer) extraButtonsContainer.classList.add('visible-controls');
+      if (scaleButtonsContainer) scaleButtonsContainer.classList.add('visible-controls');
+    } else {
+      if (extraButtonsContainer) extraButtonsContainer.classList.remove('visible-controls');
+      if (scaleButtonsContainer) scaleButtonsContainer.classList.remove('visible-controls');
+    }
+    // When hiding AR controls, ensure they can't be focused or clicked
+    if (!show) {
+      if (resetBtn) { resetBtn.tabIndex = -1; resetBtn.setAttribute('aria-hidden', 'true'); }
+      if (exitBtn)  { exitBtn.tabIndex = -1;  exitBtn.setAttribute('aria-hidden', 'true'); }
+      if (scaleUpBtn) { scaleUpBtn.tabIndex = -1; scaleUpBtn.setAttribute('aria-hidden', 'true'); }
+      if (scaleDownBtn) { scaleDownBtn.tabIndex = -1; scaleDownBtn.setAttribute('aria-hidden', 'true'); }
+    } else {
+      if (resetBtn) { resetBtn.tabIndex = 0; resetBtn.removeAttribute('aria-hidden'); }
+      if (exitBtn)  { exitBtn.tabIndex = 0;  exitBtn.removeAttribute('aria-hidden'); }
+      // scale buttons remain controlled by setButtonsEnabled (enabled only when model placed)
+      if (scaleUpBtn) scaleUpBtn.removeAttribute('aria-hidden');
+      if (scaleDownBtn) scaleDownBtn.removeAttribute('aria-hidden');
+    }
+  }
 
   // UI helpers
   function clamp100(v) { return Math.max(0, Math.min(100, Math.round(v * 100) / 100)); }
@@ -111,6 +134,8 @@
   // Reset button -> dispatch reset & update UI state
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
+      // only allow when inXR
+      if (!inXR) { fadeInfo("Fitur ini hanya tersedia saat berada di AR."); return; }
       // inform AR system to reset scene
       window.dispatchEvent(new CustomEvent('reset'));
       // reset local UI values & lock actions until model placed again
@@ -121,6 +146,7 @@
   // Exit AR button -> request exit; index.js will handle ending session
   if (exitBtn) {
     exitBtn.addEventListener('click', () => {
+      if (!inXR) { fadeInfo("Fitur ini hanya tersedia saat berada di AR."); return; }
       window.dispatchEvent(new CustomEvent('request-exit-ar'));
       fadeInfo("Meminta keluar AR...");
     });
@@ -171,18 +197,26 @@
     updateBars();
   });
 
-  // when XR started: hide Enter AR button
+  // when XR started: hide Enter AR button and show AR-only controls
   window.addEventListener('xr-started', () => {
     if (xrBtn) xrBtn.classList.add('hidden');
     fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
+
+    // show AR controls (scale + extra)
+    showARControls(true);
+
+    // note: action buttons still controlled by model-placed (so they remain disabled until model is placed)
   });
 
-  // when XR ended: show Enter AR again and lock UI
+  // when XR ended: show Enter AR again and hide AR-only controls
   window.addEventListener('xr-ended', () => {
     if (xrBtn) xrBtn.classList.remove('hidden');
     toothReady = false;
     setButtonsEnabled(false);
     fadeInfo("AR berhenti. Arahkan kamera ke lantai dan tekan Enter AR.");
+
+    // hide AR-only controls
+    showARControls(false);
   });
 
   // local state changes (if some other part dispatches health-changed directly)
@@ -251,4 +285,6 @@
 
   // initial UI
   updateBars();
+  // ensure AR controls hidden initially
+  showARControls(false);
 })();
