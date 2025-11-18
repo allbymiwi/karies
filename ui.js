@@ -57,14 +57,31 @@
     }
   }
 
+  // NEW: Function to directly request AR session (tanpa lewat tombol Enter AR)
+  async function startARSession() {
+    try {
+      // Hide splash screen
+      hideSplashScreen();
+      
+      // Langsung panggil requestXRSession dari window (yang ada di index.js)
+      if (window.requestXRSession) {
+        await window.requestXRSession();
+      } else {
+        // Fallback: panggil melalui event
+        window.dispatchEvent(new CustomEvent('request-ar-session'));
+      }
+    } catch (error) {
+      console.error('Failed to start AR session:', error);
+      // Jika gagal, tampilkan kembali splash screen
+      showSplashScreen();
+      alert('Gagal memulai AR: ' + error.message);
+    }
+  }
+
   // NEW: Start button click handler
   if (startBtn) {
     startBtn.addEventListener('click', () => {
-      // Hide splash screen
-      hideSplashScreen();
-      // Show XR button and trigger AR session
-      xrBtn.classList.remove('hidden');
-      xrBtn.click(); // Automatically trigger AR session
+      startARSession();
     });
   }
 
@@ -245,10 +262,8 @@
       window.dispatchEvent(new CustomEvent('request-exit-ar'));
       fadeInfo("Keluar AR...");
       
-      // NEW: Show splash screen after a short delay
-      setTimeout(() => {
-        showSplashScreen();
-      }, 500);
+      // NEW: Langsung show splash screen tanpa delay
+      showSplashScreen();
     });
   }
 
@@ -301,7 +316,7 @@
 
   // when XR started: hide Enter AR button and show AR-only controls
   window.addEventListener('xr-started', () => {
-    if (xrBtn) xrBtn.classList.add('hidden');
+    // XR button sudah hidden dari awal, jadi tidak perlu diubah
     fadeInfo("Arahkan kamera ke model dan tekan salah satu aksi.");
 
     // show AR controls (scale + extra) and AR UI elements
@@ -312,10 +327,9 @@
 
   // when XR ended: show Enter AR again and hide AR-only controls
   window.addEventListener('xr-ended', () => {
-    if (xrBtn) xrBtn.classList.remove('hidden');
     toothReady = false;
     setButtonsEnabled(false);
-    fadeInfo("AR berhenti. Arahkan kamera ke lantai dan tekan Enter AR.");
+    fadeInfo("AR berhenti.");
 
     // hide AR-only controls and AR UI elements
     showARControls(false);
@@ -323,10 +337,8 @@
     // NEW: Reset tooth status when AR ends
     updateToothStatus(null);
     
-    // NEW: Show splash screen when XR session ends (baik dari exit AR maupun session end natural)
-    setTimeout(() => {
-      showSplashScreen();
-    }, 500);
+    // NEW: Show splash screen when XR session ends
+    showSplashScreen();
   });
 
   // local state changes (if some other part dispatches health-changed directly)
@@ -398,7 +410,6 @@
     updateBars();
     // NEW: Reset tooth status
     updateToothStatus(null);
-    fadeInfo("Model direset, silakan place ulang.");
   }
 
   // expose for debugging
@@ -407,6 +418,7 @@
     updateBars,
     fadeInfo,
     updateToothStatus, // NEW: expose tooth status function
+    startARSession, // NEW: expose start AR function
     _getState: () => ({ cleanValue, healthValue, sweetCount, healthyCount })
   };
 
