@@ -65,7 +65,7 @@ canvas {
   height: 18px;
 }
 
-/* NEW: Credit Popup - BACKGROUND PUTIH seperti odontogram */
+/* NEW: Credit Popup - BACKGROUND PUTIH SOLID tidak transparan */
 .credit-popup {
   background: white;
   color: #333;
@@ -73,6 +73,8 @@ canvas {
   max-height: 70vh;
   overflow-y: auto;
   padding: 20px;
+  border: 2px solid #e0e0e0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .credit-popup h3 {
@@ -90,10 +92,11 @@ canvas {
 }
 
 .credit-item {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 10px;
-  border: 1px solid #e9ecef;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .credit-item strong {
